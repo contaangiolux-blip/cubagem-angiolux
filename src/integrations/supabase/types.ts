@@ -14,7 +14,144 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      caixas: {
+        Row: {
+          altura_cm: number
+          caixa_fornecedor: boolean
+          caixa_terciaria_fornecedor: number | null
+          caixas_secundarias_permitidas_na_terciaria: number | null
+          codigo_caixa: number
+          comprimento_cm: number
+          largura_cm: number
+          nome_caixa: string
+          observacao: string | null
+          peso_caixa_kg: number
+          quantidade_itens_por_caixa_secundaria: number | null
+          quantidade_itens_por_caixa_terciaria: number | null
+          terciaria_parcial_minimo: number | null
+          tipo_caixa: string
+          updated_at: string | null
+        }
+        Insert: {
+          altura_cm?: number
+          caixa_fornecedor?: boolean
+          caixa_terciaria_fornecedor?: number | null
+          caixas_secundarias_permitidas_na_terciaria?: number | null
+          codigo_caixa: number
+          comprimento_cm?: number
+          largura_cm?: number
+          nome_caixa: string
+          observacao?: string | null
+          peso_caixa_kg?: number
+          quantidade_itens_por_caixa_secundaria?: number | null
+          quantidade_itens_por_caixa_terciaria?: number | null
+          terciaria_parcial_minimo?: number | null
+          tipo_caixa: string
+          updated_at?: string | null
+        }
+        Update: {
+          altura_cm?: number
+          caixa_fornecedor?: boolean
+          caixa_terciaria_fornecedor?: number | null
+          caixas_secundarias_permitidas_na_terciaria?: number | null
+          codigo_caixa?: number
+          comprimento_cm?: number
+          largura_cm?: number
+          nome_caixa?: string
+          observacao?: string | null
+          peso_caixa_kg?: number
+          quantidade_itens_por_caixa_secundaria?: number | null
+          quantidade_itens_por_caixa_terciaria?: number | null
+          terciaria_parcial_minimo?: number | null
+          tipo_caixa?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      cubagens: {
+        Row: {
+          cliente: string | null
+          created_at: string | null
+          data_pedido: string | null
+          id: string
+          itens: Json | null
+          m3_total: number | null
+          pedido: string | null
+          peso_total_kg: number | null
+          quantidade_volumes: number | null
+          resultado: Json | null
+          texto_cliente: string | null
+          tipo_frete: string | null
+          user_email: string | null
+          user_id: string | null
+          valor_nf: number | null
+          volumes: Json | null
+        }
+        Insert: {
+          cliente?: string | null
+          created_at?: string | null
+          data_pedido?: string | null
+          id?: string
+          itens?: Json | null
+          m3_total?: number | null
+          pedido?: string | null
+          peso_total_kg?: number | null
+          quantidade_volumes?: number | null
+          resultado?: Json | null
+          texto_cliente?: string | null
+          tipo_frete?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          valor_nf?: number | null
+          volumes?: Json | null
+        }
+        Update: {
+          cliente?: string | null
+          created_at?: string | null
+          data_pedido?: string | null
+          id?: string
+          itens?: Json | null
+          m3_total?: number | null
+          pedido?: string | null
+          peso_total_kg?: number | null
+          quantidade_volumes?: number | null
+          resultado?: Json | null
+          texto_cliente?: string | null
+          tipo_frete?: string | null
+          user_email?: string | null
+          user_id?: string | null
+          valor_nf?: number | null
+          volumes?: Json | null
+        }
+        Relationships: []
+      }
+      produtos: {
+        Row: {
+          codigo: string
+          codigo_caixa: number | null
+          fabricante: string | null
+          nome_produto: string | null
+          peso_unitario_kg: number
+          updated_at: string | null
+        }
+        Insert: {
+          codigo: string
+          codigo_caixa?: number | null
+          fabricante?: string | null
+          nome_produto?: string | null
+          peso_unitario_kg?: number
+          updated_at?: string | null
+        }
+        Update: {
+          codigo?: string
+          codigo_caixa?: number | null
+          fabricante?: string | null
+          nome_produto?: string | null
+          peso_unitario_kg?: number
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

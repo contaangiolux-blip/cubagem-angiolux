@@ -7,7 +7,7 @@
  * Recebe o resultado de page.getTextContent() de cada página (pdfjs-dist) para não depender
  * do ambiente (navegador ou Node). No app: usar `getDocument({ data }).promise`.
  */
-import type { Pedido, ItemPedido } from "./cubagem.ts";
+import type { Pedido, ItemPedido } from "./cubagem";
 
 export interface Palavra {
   x0: number;
