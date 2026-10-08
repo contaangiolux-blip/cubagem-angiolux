@@ -1,0 +1,43 @@
+codigo_caixa;nome_caixa;peso_caixa_kg;largura_cm;altura_cm;comprimento_cm;tipo_caixa;caixa_fornecedor;quantidade_itens_por_caixa_secundaria;quantidade_itens_por_caixa_terciaria;caixas_secundarias_permitidas_na_terciaria;caixa_terciaria_fornecedor;terciaria_parcial_minimo;observacao
+1;Caixa Secundária Introdutores Shunmei;0.2;28.5;21;11;secundaria;;10;;;17;;
+2;Caixa Secundária Fios Guia Brosmed;0.1;26.5;24;5.5;secundaria;;10;;;18;;
+3;Caixa Secundária Introdutores Brosmed;0.1;34;13;11.5;secundaria;;5;;;19;;
+4;Caixa Secundária Fios Guia Shunmei;0.15;25;22.5;13;secundaria;;25;;;20;;
+5;Caixa Secundária Fios Guia Xiamen;0.15;25;25;10;secundaria;;20;;;21;;
+6;Caixa Secundária Cateter Angiográfico Shunmei;0.2;123;11;3.5;secundaria;;5;;;22;;Produto muito comprido: só viaja na caixa original (22) ou na Angiolux comprida (40)
+7;Caixa Secundária Torniquete Shunmei;0.17;33;10.5;17;secundaria;;10;;;23;;
+8;Caixa Secundária Dilatador Xiamen;0.26;37;34;13;secundaria;;5;;;24;;
+9;Caixa Secundária Manifold Brosmed;0.1;23;11;15.5;secundaria;;10;;;25;;
+10;Caixa Secundária Manifold Xiamen;0.118;29.5;18.5;7;secundaria;;10;;;26;;
+11;Caixa Secundária Kit Hemostasia Xiamen;0.118;29.5;18.5;7;secundaria;;10;;;27;;
+12;Caixa Secundária Conector Y Xiamen;0.118;29.5;18.5;7;secundaria;;10;;;27;;Packing list Xiamen PO 332: conector Y (YF-A-2.0/3.0) vem 100 un/ctn 40x40x34, mesma caixa do kit hemostasia
+13;Caixa Secundária Insuflador Brosmed;0.1;32.5;12;8;secundaria;;5;;;28;;Corrigido 07/10/2026 (Pedro): 4 cx x 5 un = 20
+14;Caixa Secundária Balões Periféricos Simeks;0.1;25.5;23.5;1.5;secundaria;;1;;;29;;Caixa lacrada (tyvek), não pode ser aberta
+15;Caixa Secundária PHS;0.1;27.5;19.3;3.4;secundaria;;1;;;32;;Caixa lacrada (tyvek), não pode ser aberta
+16;Caixa Secundária Simvalve Force;0.2;31;28.5;2.5;secundaria;;1;;;31;;Caixa lacrada (tyvek), não pode ser aberta
+42;Caixa Secundária Balões Coronários Simeks;0.1;25.5;23.5;1.5;secundaria;;1;;;30;;CONFERIR dimensões (assumidas iguais à dos periféricos). Caixa lacrada (tyvek)
+17;Caixa Terciária Shunmei Introdutor;1.06;45;31;58;terciaria;TRUE;;100;10;;;Packing list Shunmei PO 331: 100 un/ctn 45x30x60, peso bruto 7,3 kg
+18;Caixa Terciária Brosmed Fio Guia;2.8;74;52;29;terciaria;TRUE;;240;24;;;Packing list Brosmed PO 120: 240 un/ctn 74x54x32, peso bruto 12 kg
+19;Caixa Terciária Brosmed Introdutor;1.65;59;54;36;terciaria;TRUE;;100;20;;;Corrigido 07/10/2026: 100 un (packing list Brosmed PO 115: 100 un/ctn 59,5x54x36, peso bruto 8,5 kg)
+20;Caixa Terciária Shunmei Fio Guia;1.9;53;49;56;terciaria;TRUE;;400;16;;;Packing list Shunmei PO 331: 400 un/ctn 55x49x56, peso bruto 15 kg
+21;Caixa Terciária Xiamen Fio Guia;1.15;53;27.5;54;terciaria;TRUE;;200;10;;;Packing list Xiamen PO 332: 200 un/ctn 53x28x54, peso bruto 10 kg
+22;Caixa Terciária Shunmei Cat Angiográfico;1.15;125;25;19;terciaria;TRUE;;40;8;;;Corrigido 07/10/2026: 8 secundárias de 5 = 40. Dimensões do packing list Shunmei PO 327 (125x25x19, peso bruto 5 kg); antes constava 127x24x13
+23;Caixa Terciária Shunmei Torniquete;0.97;64;45;50;terciaria;TRUE;;100;10;;;
+24;Caixa Terciária Xiamen Dilatador;1.175;55;36;40;terciaria;TRUE;;20;4;;;Packing list Xiamen PO 332: 20 un/ctn 55x35x40, peso bruto 9 kg
+25;Caixa Terciária Brosmed Manifold;0.85;57;24;50;terciaria;TRUE;;150;15;;;
+26;Caixa Terciária Xiamen Manifold;1.088;40;39;33;terciaria;TRUE;;100;10;;;Packing list Xiamen PO 332: 100 un/ctn 40x40x34, peso bruto 5,5 kg
+27;Caixa Terciária Xiamen Kit Hemostasia / Conector Y;1.012;40;39;33;terciaria;TRUE;;100;10;;;Packing list Xiamen PO 332: 100 un/ctn 40x40x34, peso bruto 5 kg
+28;Caixa Terciária Brosmed Insuflador;1;50;42;35;terciaria;TRUE;;20;4;;;
+29;Caixa Terciária Simeks Periféricos;1;56;40;26;terciaria;TRUE;;47;47;;0.6;Pedidos grandes (encomenda) saem na caixa original mesmo incompleta, com enchimento
+30;Caixa Terciária Simeks Coronários;1;56;40;26;terciaria;TRUE;;60;60;;0.6;Pedidos grandes (encomenda) saem na caixa original mesmo incompleta, com enchimento
+31;Caixa Terciária Simeks Simvalve Force;0.75;40;30;35;terciaria;TRUE;;15;15;;0.6;Pedidos grandes (encomenda) saem na caixa original mesmo incompleta, com enchimento
+32;Caixa Terciária PHS;0.75;56;40;28;terciaria;TRUE;;32;32;;0.6;Packing list PHS PO 324: 32 un/ctn 56x40x29, peso bruto 9,8 kg. Pedidos grandes saem na caixa original com enchimento
+33;Caixa Terciária Angiolux Mini;0.25;35;25;12;terciaria;FALSE;;;;;;
+34;Caixa Terciária Angiolux Pequena;0.55;68;26;20;terciaria;FALSE;;;;;;
+35;Caixa Terciária Angiolux Quadrada;0.65;33;33;33;terciaria;FALSE;;;;;;
+36;Caixa Terciária Angiolux Média;0.7;68;27;25;terciaria;FALSE;;;;;;
+37;Caixa Terciária Angiolux Xiamen;1.15;55;36;40;terciaria;FALSE;;;;;;
+38;Caixa Terciária Angiolux (15 Dilatadores);0.8;40;35;41;terciaria;FALSE;;;;;;
+39;Caixa Terciária Angiolux Grande;1;73;34;35;terciaria;FALSE;;;;;;
+40;Caixa Terciária Angiolux Cat Angiográfico;1;127;26;20;terciaria;FALSE;;;;;;
+41;Caixa Terciária Angiolux Simvalve Force;0.65;40;30;35;terciaria;FALSE;;;;;;

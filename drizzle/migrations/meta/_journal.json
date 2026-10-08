@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1791464484975,
+      "tag": "0000_cubagem_schema",
+      "breakpoints": true
+    }
+  ]
+}
