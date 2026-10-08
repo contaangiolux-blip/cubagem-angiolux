@@ -43,7 +43,7 @@ function LoginPage() {
         ? await supabase.auth.signInWithPassword({ email, password: senha })
         : await supabase.auth.signUp({ email, password: senha, options: { emailRedirectTo: window.location.origin } });
     setBusy(false);
-    if (error) return toast.error(traduzir(error.message));
+    if (error) { toast.error(traduzir(error.message)); return; }
     toast.success(modo === "entrar" ? "Bem-vindo!" : "Conta criada.");
     navigate({ to: "/", replace: true });
   }

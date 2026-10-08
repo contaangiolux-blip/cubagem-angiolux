@@ -50,7 +50,7 @@ function CubagemPage() {
 
   async function receber(file?: File) {
     if (!file) return;
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) return toast.error("Envie um arquivo PDF.");
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) { toast.error("Envie um arquivo PDF."); return; }
     setLendo(true);
     setRes(null);
     try {
@@ -72,14 +72,14 @@ function CubagemPage() {
   function adicionar() {
     const cod = novoCod.trim();
     const q = parseInt(novaQtd, 10);
-    if (!cod || !(q > 0)) return toast.error("Informe código e quantidade.");
+    if (!cod || !(q > 0)) { toast.error("Informe código e quantidade."); return; }
     const prod = produtos.get(cod.toUpperCase());
     setItens((it) => [...it, { codigo: prod?.codigo ?? cod, descricao: prod?.nome ?? "", qtd: q }]);
     setNovoCod(""); setNovaQtd("1");
   }
 
   function calc() {
-    if (!pedido?.itens.length) return toast.error("Adicione ao menos um item.");
+    if (!pedido?.itens.length) { toast.error("Adicione ao menos um item."); return; }
     setRes(calcular({ ...pedido, itens: pedido.itens.filter((i) => i.qtd > 0) }, produtos, caixas));
   }
 
@@ -92,7 +92,7 @@ function CubagemPage() {
       pedido: res.pedido.numero, cliente: res.pedido.cliente, data_pedido: res.pedido.data, tipo_frete: res.pedido.tipo_frete,
       valor_nf: res.pedido.valor_total, itens: j.itens, volumes: j.volumes, resultado: j, texto_cliente: textoParaCliente(res),
       quantidade_volumes: j.quantidade_volumes, peso_total_kg: j.peso_total_kg, m3_total: j.m3_total,
-      user_id: u.user?.id, user_email: u.user?.email,
+      user_id: u.user?.id ?? null, user_email: u.user?.email ?? null,
     });
     setSalvando(false);
     if (error) toast.error(`Erro ao salvar: ${error.message}`);

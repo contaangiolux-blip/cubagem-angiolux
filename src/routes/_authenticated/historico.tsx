@@ -39,7 +39,7 @@ function HistoricoPage() {
   async function excluir(id: string) {
     if (!confirm("Excluir este registro do histórico?")) return;
     const { error } = await supabase.from("cubagens").delete().eq("id", id);
-    if (error) return toast.error(`Erro ao excluir: ${error.message}`);
+    if (error) { toast.error(`Erro ao excluir: ${error.message}`); return; }
     toast.success("Registro excluído");
     setSel(null);
     qc.invalidateQueries({ queryKey: ["cubagens"] });

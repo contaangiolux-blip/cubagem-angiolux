@@ -22,6 +22,6 @@ export function parseCsv(txt: string): Record<string, string>[] {
   }
   row.push(cell);
   if (row.some((c) => c !== "")) rows.push(row);
-  const [head, ...body] = rows;
+  const [head = [], ...body] = rows;
   return body.map((r) => Object.fromEntries(head.map((h, i) => [h.trim(), r[i] ?? ""])));
 }

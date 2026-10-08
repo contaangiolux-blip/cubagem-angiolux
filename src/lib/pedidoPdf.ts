@@ -28,10 +28,10 @@ export function extrairPalavras(pag: PaginaTexto): Array<Palavra & { y: number }
   for (const it of pag.items) {
     const str = it.str;
     if (!str || !str.trim()) continue;
-    const x = it.transform[4];
-    const fontH = Math.abs(it.transform[3]) || it.height || 0;
+    const x = it.transform[4] ?? 0;
+    const fontH = Math.abs(it.transform[3] ?? 0) || it.height || 0;
     // pdf.js: baseline em (e,f) com origem embaixo; PyMuPDF usa y0 = topo do bbox
-    const yTop = pag.altura - it.transform[5] - fontH * 0.8;
+    const yTop = pag.altura - (it.transform[5] ?? 0) - fontH * 0.8;
     const larguraTotal = it.width || 0;
     const charW = str.length ? larguraTotal / str.length : 0;
     // divide o item em palavras (espaços) estimando o x de cada uma proporcionalmente
@@ -74,9 +74,9 @@ export function lerPedidoDePaginas(paginas: PaginaTexto[]): Pedido {
     let col: { qtd: number; valor: number; total: number } | null = null;
     let idxHeader = -1;
     for (let i = 0; i < rows.length; i++) {
-      const textos = rows[i].map((p) => p.w);
+      const textos = rows[i]!.map((p) => p.w);
       if (textos.includes("QTD") && textos.includes("Valor") && textos.includes("Total")) {
-        const pos = (w: string) => rows[i].find((p) => p.w === w)!.x0;
+        const pos = (w: string) => rows[i]!.find((p) => p.w === w)!.x0;
         col = { qtd: pos("QTD"), valor: pos("Valor"), total: pos("Total") };
         idxHeader = i;
         break;
@@ -85,22 +85,22 @@ export function lerPedidoDePaginas(paginas: PaginaTexto[]): Pedido {
 
     for (const row of rows) {
       const textos = row.map((p) => p.w);
-      if (!pedido.numero && textos.length === 2 && textos[0] === "PEDIDO" && /^\d+$/.test(textos[1])) {
-        pedido.numero = textos[1];
+      if (!pedido.numero && textos.length === 2 && textos[0] === "PEDIDO" && /^\d+$/.test(textos[1] ?? "")) {
+        pedido.numero = textos[1]!;
       }
       if (!pedido.cliente && textos.length && textos[0] === "CLIENTE:") {
         pedido.cliente = textos.slice(1).join(" ").replace(/^[\s-]+|[\s-]+$/g, "");
       }
       if (!pedido.data && textos.includes("DATA:")) {
         const j = textos.indexOf("DATA:");
-        if (j + 1 < textos.length) pedido.data = textos[j + 1];
+        if (j + 1 < textos.length) pedido.data = textos[j + 1]!;
       }
       if (!pedido.tipo_frete && textos.includes("FRETE:") && textos.includes("TIPO")) {
         const j = textos.indexOf("FRETE:");
-        if (j + 1 < textos.length) pedido.tipo_frete = textos[j + 1];
+        if (j + 1 < textos.length) pedido.tipo_frete = textos[j + 1]!;
       }
       if (pedido.valor_total === null && textos.length === 2 && textos[0] === "TOTAL:") {
-        pedido.valor_total = paraFloatBr(textos[1]);
+        pedido.valor_total = paraFloatBr(textos[1]!);
       }
     }
 
@@ -130,7 +130,7 @@ export function lerPedidoDePaginas(paginas: PaginaTexto[]): Pedido {
         pedido.itens.push(item);
       } else if (desc.length && pedido.itens.length && !codigo.length && !qtd.length) {
         // continuação de descrição quebrada em 2 linhas
-        pedido.itens[pedido.itens.length - 1].descricao += " " + desc.join(" ");
+        pedido.itens[pedido.itens.length - 1]!.descricao += " " + desc.join(" ");
       }
     }
   }

@@ -13,18 +13,18 @@ describe("cubagem", () => {
   it("BM-FA0611:20", () => {
     const r = run("BM-FA0611:20");
     expect(r.quantidade_volumes).toBe(1);
-    expect(r.volumes[0].caixa).toBe("Caixa Terciária Angiolux Pequena");
-    expect(r.volumes[0].dimensoes_cm).toEqual([68, 26, 20]);
-    expect(r.volumes[0].peso_kg).toBe(1.99);
-    expect(r.volumes[0].m3).toBe(0.03536);
+    expect(r.volumes[0]!.caixa).toBe("Caixa Terciária Angiolux Pequena");
+    expect(r.volumes[0]!.dimensoes_cm).toEqual([68, 26, 20]);
+    expect(r.volumes[0]!.peso_kg).toBe(1.99);
+    expect(r.volumes[0]!.m3).toBe(0.03536);
   });
 
   it("615601:137", () => {
     const r = run("615601:137");
     expect(r.quantidade_volumes).toBe(2);
     expect(r.volumes[0]).toMatchObject({ caixa: "Caixa Terciária Shunmei Introdutor", dimensoes_cm: [45, 31, 58], peso_kg: 7.86, origem: "fornecedor" });
-    expect(r.volumes[1]).toMatchObject({ caixa: "Caixa Terciária Angiolux Pequena", dimensoes_cm: [68, 26, 20], peso_kg: 3.126 });
-    expect(r.volumes[1].conteudo).toContain("4x Caixa Secundária Introdutores Shunmei (3 cheia(s) + 1 parcial c/ 7 un) = 37 un 615601");
+    expect(r.volumes[1]!).toMatchObject({ caixa: "Caixa Terciária Angiolux Pequena", dimensoes_cm: [68, 26, 20], peso_kg: 3.126 });
+    expect(r.volumes[1]!.conteudo).toContain("4x Caixa Secundária Introdutores Shunmei (3 cheia(s) + 1 parcial c/ 7 un) = 37 un 615601");
     expect(r.peso_total_kg).toBe(10.986);
   });
 
@@ -36,7 +36,7 @@ describe("cubagem", () => {
     dil.forEach((v) => { expect(v.dimensoes_cm).toEqual([55, 36, 40]); expect(v.peso_kg).toBe(9.095); });
     const peq = r.volumes.filter((v) => v.caixa === "Caixa Terciária Angiolux Pequena");
     expect(peq).toHaveLength(1);
-    expect(peq[0].peso_kg).toBe(2.59);
+    expect(peq[0]!.peso_kg).toBe(2.59);
     expect(r.peso_total_kg).toBe(48.065);
   });
 

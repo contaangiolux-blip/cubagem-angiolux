@@ -429,7 +429,7 @@ function consolidar(
   }
 
   // FFD: abre caixas do tamanho da maior candidata e depois reduz cada uma
-  const maior = candidatas[candidatas.length - 1];
+  const maior = candidatas[candidatas.length - 1]!;
   const bins: Pacote[][] = [];
   for (const p of pacotes) {
     let colocado = false;
@@ -464,10 +464,10 @@ function montarVolume(caixa: Caixa, pacotes: Pacote[]): Volume {
     const cheias = ps.filter((p) => p.unidades === p.caixa.itens_sec).length;
     const parciais = ps.filter((p) => p.unidades !== p.caixa.itens_sec);
     const un = ps.reduce((s, p) => s + p.unidades, 0);
-    let txt = `${ps.length}x ${ps[0].caixa.nome}`;
-    if (parciais.length && cheias) txt += ` (${cheias} cheia(s) + 1 parcial c/ ${parciais[0].unidades} un)`;
-    else if (parciais.length) txt += ` (parcial c/ ${parciais[0].unidades} un)`;
-    txt += ` = ${un} un ${ps[0].produto.codigo}`;
+    let txt = `${ps.length}x ${ps[0]!.caixa.nome}`;
+    if (parciais.length && cheias) txt += ` (${cheias} cheia(s) + 1 parcial c/ ${parciais[0]!.unidades} un)`;
+    else if (parciais.length) txt += ` (parcial c/ ${parciais[0]!.unidades} un)`;
+    txt += ` = ${un} un ${ps[0]!.produto.codigo}`;
     conteudo.push(txt);
   }
   const peso = caixa.peso + pacotes.reduce((s, p) => s + pesoPacote(p), 0);
@@ -559,9 +559,9 @@ export function textoParaCliente(res: Resultado): string {
   const linhas: string[] = [];
   linhas.push(`Quantidade de volumes: ${res.volumes.length}`);
   if (grupos.size === 1) {
-    const [dims, vs] = [...grupos.entries()][0];
+    const [dims, vs] = [...grupos.entries()][0]!;
     linhas.push(`Peso: ${fmtKg(pesoTotal(res))} kg`);
-    linhas.push(`Dimensões: ${dims} cm` + (vs.length > 1 ? ` (cada volume ~${fmtKg(vs[0].peso)} kg)` : ""));
+    linhas.push(`Dimensões: ${dims} cm` + (vs.length > 1 ? ` (cada volume ~${fmtKg(vs[0]!.peso)} kg)` : ""));
   } else {
     linhas.push(`Peso total: ${fmtKg(pesoTotal(res))} kg`);
     linhas.push("Dimensões:");
