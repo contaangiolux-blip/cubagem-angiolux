@@ -6,7 +6,7 @@ import { Copy, Loader2, Trash2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cubagensQuery, fmtDataHora, fmtNum, type CubagemDb } from "@/lib/data";
 import { DESCRICAO_ORIGEM, type Origem } from "@/lib/cubagem";
-import { copiar } from "./index";
+import { copiar } from "@/lib/copiar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";

@@ -10,6 +10,7 @@ import {
   pesoTotal, m3Total, DESCRICAO_ORIGEM, type Pedido, type Resultado, type CaixaRow, type ProdutoRow,
 } from "@/lib/cubagem";
 import { lerPedidoPdf } from "@/lib/lerPdf";
+import { copiar } from "@/lib/copiar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,9 +32,6 @@ export const Route = createFileRoute("/_authenticated/")({
 
 const vazio = (): Pedido => ({ numero: "", cliente: "", data: "", tipo_frete: "", valor_total: null, itens: [] });
 
-export function copiar(txt: string) {
-  navigator.clipboard.writeText(txt).then(() => toast.success("Copiado"), () => toast.error("Não foi possível copiar"));
-}
 
 function CubagemPage() {
   const cx = useQuery(caixasQuery);
