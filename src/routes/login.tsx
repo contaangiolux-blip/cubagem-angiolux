@@ -61,6 +61,25 @@ function LoginPage() {
       <Button type="submit" className="w-full" disabled={busy}>
         {busy ? "Aguarde..." : modo === "entrar" ? "Entrar" : "Criar conta"}
       </Button>
+      {modo === "entrar" && (
+        <button
+          type="button"
+          className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
+          disabled={busy}
+          onClick={async () => {
+            if (!email) { toast.error("Digite seu e-mail para redefinir a senha."); return; }
+            setBusy(true);
+            const { error } = await supabase.auth.resetPasswordForEmail(email, {
+              redirectTo: `${window.location.origin}/redefinir-senha`,
+            });
+            setBusy(false);
+            if (error) { toast.error(traduzir(error.message)); return; }
+            toast.success("Enviamos um link de redefinição para o seu e-mail.");
+          }}
+        >
+          Esqueci minha senha
+        </button>
+      )}
     </form>
   );
 
