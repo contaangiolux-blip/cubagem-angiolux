@@ -43,6 +43,8 @@ export interface ItemPedido {
   qtd: number;
   valor_unit?: number | null;
   total?: number | null;
+  /** confiança da leitura por OCR (0-100); ausente quando veio do PDF ou foi digitado */
+  confianca?: number;
 }
 
 export interface Pedido {

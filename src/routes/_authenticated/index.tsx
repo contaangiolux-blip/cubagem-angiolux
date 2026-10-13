@@ -11,6 +11,7 @@ import {
 } from "@/lib/cubagem";
 import { avisosCorreios, CEP_ORIGEM_ANGIOLUX, dimsCorreios, fmtCep, pesoCubico, pesoParaCotacao, textoParaCorreios } from "@/lib/correios";
 import { lerPedidoPdf } from "@/lib/lerPdf";
+import { CONFIANCA_MINIMA, corrigirCodigo, lerPedidoImagem } from "@/lib/pedidoImagem";
 import { copiar } from "@/lib/copiar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +44,7 @@ function CubagemPage() {
   const produtos = useMemo(() => mapProdutos((pr.data ?? []) as ProdutoRow[]), [pr.data]);
 
   const [pedido, setPedido] = useState<Pedido | null>(null);
-  const [lendo, setLendo] = useState(false);
+  const [lendo, setLendo] = useState<string | null>(null);
   const [drag, setDrag] = useState(false);
   const [res, setRes] = useState<Resultado | null>(null);
   const [salvando, setSalvando] = useState(false);
@@ -54,9 +55,9 @@ function CubagemPage() {
 
   async function receber(file?: File | null) {
     if (!file) return;
-    if (ehImagem(file)) { receberImagem(file); return; }
+    if (ehImagem(file)) { await receberImagem(file); return; }
     if (!ehPdf(file)) { toast.error("Envie o PDF do espelho do pedido ou uma imagem (captura de tela)."); return; }
-    setLendo(true);
+    setLendo("Lendo PDF...");
     setRes(null);
     try {
       const p = await lerPedidoPdf(file);
@@ -67,16 +68,37 @@ function CubagemPage() {
       console.error(e);
       toast.error("Não foi possível ler o PDF.");
     } finally {
-      setLendo(false);
+      setLendo(null);
     }
   }
 
-  /** Captura de tela do pedido (Ctrl+V, arrastar ou escolher). Por enquanto fica como referência
-   *  ao lado dos itens; a leitura automática da imagem será ligada com a função de backend. */
-  function receberImagem(file: File) {
+  /** Captura de tela do pedido (Ctrl+V, arrastar ou escolher): OCR no navegador. A imagem fica
+   *  visível ao lado dos itens para conferência. */
+  async function receberImagem(file: File) {
     setImagem((atual) => { if (atual) URL.revokeObjectURL(atual.url); return { url: URL.createObjectURL(file), nome: file.name || "captura" }; });
-    setPedido((p) => p ?? vazio());
-    toast.info("Captura recebida. Confira a imagem e informe os itens; a leitura automática da captura ainda não está ativa.");
+    setRes(null);
+    setLendo("Lendo a captura...");
+    try {
+      const r = await lerPedidoImagem(file, setLendo);
+      const existe = (c: string) => produtos.has(c.toUpperCase());
+      let corrigidos = 0;
+      const itens = r.pedido.itens.map((it) => {
+        if (existe(it.codigo)) return it;
+        const c = corrigirCodigo(it.codigo, existe);
+        if (!c) return it;
+        corrigidos++;
+        return { ...it, codigo: produtos.get(c.toUpperCase())?.codigo ?? c, confianca: Math.min(it.confianca ?? 100, CONFIANCA_MINIMA - 1) };
+      });
+      setPedido({ ...r.pedido, itens });
+      if (itens.length) toast.success(`Captura lida: ${itens.length} item(ns)${corrigidos ? `, ${corrigidos} código(s) corrigido(s) pelo cadastro` : ""}. Confira antes de calcular.`);
+      for (const a of r.avisos) toast.warning(a, { duration: 8000 });
+    } catch (e) {
+      console.error(e);
+      setPedido((p) => p ?? vazio());
+      toast.error("Não foi possível ler a captura. Informe os itens manualmente.");
+    } finally {
+      setLendo(null);
+    }
   }
 
   useEffect(() => {
@@ -158,8 +180,8 @@ function CubagemPage() {
       >
         <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => { void receber(e.target.files?.[0]); e.target.value = ""; }} />
         {lendo ? <Loader2 className="h-8 w-8 animate-spin text-primary" /> : <FileUp className="h-8 w-8 text-primary" />}
-        <p className="font-medium">{lendo ? "Lendo PDF..." : "Arraste o PDF do espelho do pedido ou clique para escolher"}</p>
-        <p className="text-xs text-muted-foreground">PDF gerado pelo Odin (em texto). Uma captura de tela também pode ser colada aqui com Ctrl+V.</p>
+        <p className="font-medium">{lendo ?? "Arraste o PDF do espelho do pedido ou clique para escolher"}</p>
+        <p className="text-xs text-muted-foreground">PDF gerado pelo Odin (em texto) ou captura de tela do pedido (Ctrl+V na página, arrastar ou escolher).</p>
       </div>
 
       {imagem && (
@@ -170,7 +192,7 @@ function CubagemPage() {
           </CardHeader>
           <CardContent>
             <img src={imagem.url} alt="Captura de tela do pedido" className="max-h-[480px] w-auto max-w-full rounded-md border object-contain" />
-            <p className="mt-2 text-xs text-muted-foreground">Use a imagem como referência para informar os itens abaixo. A leitura automática da captura será ativada em uma próxima etapa.</p>
+            <p className="mt-2 text-xs text-muted-foreground">Itens, CEP e cliente foram lidos da imagem por OCR. Confira a tabela abaixo com a captura; itens marcados "conferir" tiveram leitura duvidosa.</p>
           </CardContent>
         </Card>
       )}
@@ -224,9 +246,14 @@ function CubagemPage() {
                               onChange={(e) => setItens((l) => l.map((x, i) => (i === idx ? { ...x, qtd: parseInt(e.target.value, 10) || 0 } : x)))} />
                           </TableCell>
                           <TableCell>
-                            {!p ? <Badge className="border-transparent bg-danger-soft text-destructive">sem cadastro</Badge>
-                              : p.codigo_caixa === null ? <Badge className="border-transparent bg-warning-soft text-warning">sem caixa</Badge>
-                              : <Badge className="border-transparent bg-success-soft text-success">cadastrado</Badge>}
+                            <div className="flex flex-wrap gap-1">
+                              {!p ? <Badge className="border-transparent bg-danger-soft text-destructive">sem cadastro</Badge>
+                                : p.codigo_caixa === null ? <Badge className="border-transparent bg-warning-soft text-warning">sem caixa</Badge>
+                                : <Badge className="border-transparent bg-success-soft text-success">cadastrado</Badge>}
+                              {typeof it.confianca === "number" && it.confianca < CONFIANCA_MINIMA && (
+                                <Badge className="border-transparent bg-warning-soft text-warning" title={`Confiança da leitura: ${Math.round(it.confianca)}%`}>conferir</Badge>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell>
                             <Button variant="ghost" size="icon" aria-label="Remover" onClick={() => setItens((l) => l.filter((_, i) => i !== idx))}><Trash2 className="h-4 w-4" /></Button>
