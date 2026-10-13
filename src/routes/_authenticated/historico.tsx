@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cubagensQuery, fmtDataHora, fmtNum, type CubagemDb } from "@/lib/data";
 import { DESCRICAO_ORIGEM, type Origem } from "@/lib/cubagem";
 import { copiar } from "@/lib/copiar";
+import { fmtCep } from "@/lib/correios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -85,7 +86,7 @@ function HistoricoPage() {
             <>
               <DialogHeader>
                 <DialogTitle>Pedido {sel.pedido || "-"}</DialogTitle>
-                <DialogDescription>{sel.cliente} · {sel.data_pedido} · {sel.tipo_frete} · salvo em {fmtDataHora(sel.created_at)} por {sel.user_email}</DialogDescription>
+                <DialogDescription>{sel.cliente} · {sel.data_pedido} · {sel.tipo_frete}{sel.cep ? ` · CEP ${fmtCep(sel.cep)}${sel.cidade ? ` (${sel.cidade}${sel.uf ? "/" + sel.uf : ""})` : ""}` : ""} · salvo em {fmtDataHora(sel.created_at)} por {sel.user_email}</DialogDescription>
               </DialogHeader>
               <div className="space-y-2">
                 {((sel.volumes ?? []) as VolJson[]).map((v, i) => (

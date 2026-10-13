@@ -26,6 +26,9 @@ describe("leitura do espelho do pedido (Odin)", () => {
     expect(p.data).toBe("23/07/2026");
     expect(p.tipo_frete).toBe("FOB");
     expect(p.valor_total).toBe(620);
+    expect(p.cep).toBe("60160280");
+    expect(p.cidade).toBe("FORTALEZA");
+    expect(p.uf).toBe("CE");
     expect(p.itens).toEqual([
       {
         codigo: "BM-FA0611",

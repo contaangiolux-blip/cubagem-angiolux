@@ -70,6 +70,9 @@ export type Database = {
       }
       cubagens: {
         Row: {
+          cep: string | null
+          cidade: string | null
+          uf: string | null
           cliente: string | null
           created_at: string | null
           data_pedido: string | null
@@ -88,6 +91,9 @@ export type Database = {
           volumes: Json | null
         }
         Insert: {
+          cep?: string | null
+          cidade?: string | null
+          uf?: string | null
           cliente?: string | null
           created_at?: string | null
           data_pedido?: string | null
@@ -106,6 +112,9 @@ export type Database = {
           volumes?: Json | null
         }
         Update: {
+          cep?: string | null
+          cidade?: string | null
+          uf?: string | null
           cliente?: string | null
           created_at?: string | null
           data_pedido?: string | null

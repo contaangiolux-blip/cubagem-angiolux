@@ -65,7 +65,7 @@ export function paraFloatBr(s: string): number | null {
 }
 
 export function lerPedidoDePaginas(paginas: PaginaTexto[]): Pedido {
-  const pedido: Pedido = { numero: "", cliente: "", data: "", tipo_frete: "", valor_total: null, itens: [] };
+  const pedido: Pedido = { numero: "", cliente: "", data: "", tipo_frete: "", valor_total: null, itens: [], cep: "", cidade: "", uf: "" };
 
   for (const pag of paginas) {
     const rows = agruparLinhas(extrairPalavras(pag));
@@ -98,6 +98,23 @@ export function lerPedidoDePaginas(paginas: PaginaTexto[]): Pedido {
       if (!pedido.tipo_frete && textos.includes("FRETE:") && textos.includes("TIPO")) {
         const j = textos.indexOf("FRETE:");
         if (j + 1 < textos.length) pedido.tipo_frete = textos[j + 1]!;
+      }
+      if (!pedido.cep && textos.includes("CEP:")) {
+        const j = textos.indexOf("CEP:");
+        const cep = (textos[j + 1] ?? "").replace(/\D/g, "");
+        if (cep.length === 8) pedido.cep = cep;
+      }
+      if (!pedido.cidade && textos[0] === "CIDADE:") {
+        // "CIDADE: FORTALEZA - CE    BAIRRO: CENTRO"
+        const fim = textos.indexOf("BAIRRO:");
+        const partes = textos.slice(1, fim === -1 ? undefined : fim);
+        const sep = partes.lastIndexOf("-");
+        if (sep > 0 && sep === partes.length - 2) {
+          pedido.cidade = partes.slice(0, sep).join(" ");
+          pedido.uf = partes[sep + 1] ?? "";
+        } else {
+          pedido.cidade = partes.join(" ");
+        }
       }
       if (pedido.valor_total === null && textos.length === 2 && textos[0] === "TOTAL:") {
         pedido.valor_total = paraFloatBr(textos[1]!);

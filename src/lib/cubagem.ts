@@ -52,6 +52,10 @@ export interface Pedido {
   tipo_frete: string;
   valor_total: number | null;
   itens: ItemPedido[];
+  /** endereço de entrega (para cotação nos Correios) */
+  cep?: string;
+  cidade?: string;
+  uf?: string;
 }
 
 export interface Pacote {
