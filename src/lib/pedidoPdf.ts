@@ -5,8 +5,7 @@
  * cabeçalho "Código / Descrição / QTD / Valor / Total" e atribui cada palavra a uma coluna
  * pela posição x. Captura nº do pedido, cliente, data, tipo de frete, CEP/cidade/UF e TOTAL.
  *
- * As palavras podem vir do pdf.js (`extrairPalavras`) ou de OCR (ver pedidoImagem.ts);
- * `lerPedidoDeLinhas` é tolerante a pequenas falhas de leitura (acentos, maiúsculas).
+ * `lerPedidoDeLinhas` compara rótulos sem acento e sem diferenciar maiúsculas.
  */
 import type { Pedido, ItemPedido } from "./cubagem";
 
@@ -14,8 +13,6 @@ export interface Palavra {
   x0: number;
   x1: number;
   w: string;
-  /** confiança 0-100 (só OCR) */
-  conf?: number;
 }
 
 export interface PaginaTexto {
@@ -108,7 +105,7 @@ export function localizarCabecalho(rows: Palavra[][]): Colunas | null {
 
 const RE_DATA = /^\d{2}\/\d{2}\/\d{4}$/;
 
-/** Monta o pedido a partir das linhas de palavras (PDF ou OCR). `colunas` substitui a detecção do cabeçalho. */
+/** Monta o pedido a partir das linhas de palavras. `colunas` substitui a detecção do cabeçalho. */
 export function lerPedidoDeLinhas(rows: Palavra[][], pedido?: Pedido, colunas?: Colunas | null): Pedido {
   const p: Pedido = pedido ?? { numero: "", cliente: "", data: "", tipo_frete: "", valor_total: null, itens: [], cep: "", cidade: "", uf: "" };
   const col = colunas ?? localizarCabecalho(rows);
@@ -140,7 +137,7 @@ export function lerPedidoDeLinhas(rows: Palavra[][], pedido?: Pedido, colunas?: 
       if (cep.length === 8) p.cep = cep;
     }
     if (!p.cidade && normais[0] === "cidade:") {
-      // "CIDADE: FORTALEZA - CE    BAIRRO: CENTRO" (no OCR o hífen pode sumir)
+      // "CIDADE: FORTALEZA - CE    BAIRRO: CENTRO"
       const fim = normais.indexOf("bairro:");
       const partes = textos.slice(1, fim === -1 ? undefined : fim);
       const sep = partes.lastIndexOf("-");
@@ -183,8 +180,6 @@ export function lerPedidoDeLinhas(rows: Palavra[][], pedido?: Pedido, colunas?: 
         valor_unit: valor.length ? paraFloatBr(txt(valor)) : null,
         total: total.length ? paraFloatBr(txt(total)) : null,
       };
-      const confs = [...codigo, ...qtd].map((w) => w.conf).filter((c): c is number => typeof c === "number");
-      if (confs.length) item.confianca = Math.min(...confs);
       p.itens.push(item);
     } else if (desc.length && p.itens.length && !codigo.length && !qtd.length) {
       // continuação de descrição quebrada em 2 linhas

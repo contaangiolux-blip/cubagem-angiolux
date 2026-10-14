@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Calculator, Copy, FileUp, ImageIcon, Loader2, Plus, Save, Trash2, Eraser, X } from "lucide-react";
+import { AlertTriangle, Calculator, Copy, FileUp, Loader2, Plus, Save, Trash2, Eraser } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { caixasQuery, produtosQuery, fmtNum } from "@/lib/data";
 import {
@@ -11,7 +11,6 @@ import {
 } from "@/lib/cubagem";
 import { avisosCorreios, CEP_ORIGEM_ANGIOLUX, dimsCorreios, fmtCep, pesoCubico, pesoParaCotacao, textoParaCorreios } from "@/lib/correios";
 import { lerPedidoPdf } from "@/lib/lerPdf";
-import { CONFIANCA_MINIMA, corrigirCodigo, lerPedidoImagem } from "@/lib/pedidoImagem";
 import { copiar } from "@/lib/copiar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +34,6 @@ export const Route = createFileRoute("/_authenticated/")({
 const vazio = (): Pedido => ({ numero: "", cliente: "", data: "", tipo_frete: "", valor_total: null, itens: [], cep: "", cidade: "", uf: "" });
 
 const ehPdf = (f: File) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
-const ehImagem = (f: File) => f.type.startsWith("image/");
 
 function CubagemPage() {
   const cx = useQuery(caixasQuery);
@@ -50,13 +48,11 @@ function CubagemPage() {
   const [salvando, setSalvando] = useState(false);
   const [novoCod, setNovoCod] = useState("");
   const [novaQtd, setNovaQtd] = useState("1");
-  const [imagem, setImagem] = useState<{ url: string; nome: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function receber(file?: File | null) {
     if (!file) return;
-    if (ehImagem(file)) { await receberImagem(file); return; }
-    if (!ehPdf(file)) { toast.error("Envie o PDF do espelho do pedido ou uma imagem (captura de tela)."); return; }
+    if (!ehPdf(file)) { toast.error("Envie o PDF do espelho do pedido (arquivo .pdf gerado pelo Odin)."); return; }
     setLendo("Lendo PDF...");
     setRes(null);
     try {
@@ -72,40 +68,12 @@ function CubagemPage() {
     }
   }
 
-  /** Captura de tela do pedido (Ctrl+V, arrastar ou escolher): OCR no navegador. A imagem fica
-   *  visível ao lado dos itens para conferência. */
-  async function receberImagem(file: File) {
-    setImagem((atual) => { if (atual) URL.revokeObjectURL(atual.url); return { url: URL.createObjectURL(file), nome: file.name || "captura" }; });
-    setRes(null);
-    setLendo("Lendo a captura...");
-    try {
-      const r = await lerPedidoImagem(file, setLendo);
-      const existe = (c: string) => produtos.has(c.toUpperCase());
-      let corrigidos = 0;
-      const itens = r.pedido.itens.map((it) => {
-        if (existe(it.codigo)) return it;
-        const c = corrigirCodigo(it.codigo, existe);
-        if (!c) return it;
-        corrigidos++;
-        return { ...it, codigo: produtos.get(c.toUpperCase())?.codigo ?? c, confianca: Math.min(it.confianca ?? 100, CONFIANCA_MINIMA - 1) };
-      });
-      setPedido({ ...r.pedido, itens });
-      if (itens.length) toast.success(`Captura lida: ${itens.length} item(ns)${corrigidos ? `, ${corrigidos} código(s) corrigido(s) pelo cadastro` : ""}. Confira antes de calcular.`);
-      for (const a of r.avisos) toast.warning(a, { duration: 8000 });
-    } catch (e) {
-      console.error(e);
-      setPedido((p) => p ?? vazio());
-      toast.error("Não foi possível ler a captura. Informe os itens manualmente.");
-    } finally {
-      setLendo(null);
-    }
-  }
-
   useEffect(() => {
+    // Ctrl+V de um arquivo PDF copiado (ex.: no Explorador de Arquivos)
     function onPaste(e: ClipboardEvent) {
       const alvo = e.target as HTMLElement | null;
       if (alvo && (alvo.tagName === "INPUT" || alvo.tagName === "TEXTAREA")) return;
-      const arquivo = [...(e.clipboardData?.files ?? [])].find((f) => ehImagem(f) || ehPdf(f));
+      const arquivo = [...(e.clipboardData?.files ?? [])].find(ehPdf);
       if (!arquivo) return;
       e.preventDefault();
       void receber(arquivo);
@@ -135,7 +103,6 @@ function CubagemPage() {
   function limpar() {
     setPedido(vazio());
     setRes(null);
-    setImagem((atual) => { if (atual) URL.revokeObjectURL(atual.url); return null; });
   }
 
   async function salvar() {
@@ -178,24 +145,11 @@ function CubagemPage() {
         onDrop={(e: DragEvent) => { e.preventDefault(); setDrag(false); void receber(e.dataTransfer.files[0]); }}
         className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 text-center transition-colors ${drag ? "border-primary bg-accent" : "border-input bg-card hover:border-primary/60"}`}
       >
-        <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => { void receber(e.target.files?.[0]); e.target.value = ""; }} />
+        <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { void receber(e.target.files?.[0]); e.target.value = ""; }} />
         {lendo ? <Loader2 className="h-8 w-8 animate-spin text-primary" /> : <FileUp className="h-8 w-8 text-primary" />}
         <p className="font-medium">{lendo ?? "Arraste o PDF do espelho do pedido ou clique para escolher"}</p>
-        <p className="text-xs text-muted-foreground">PDF gerado pelo Odin (em texto) ou captura de tela do pedido (Ctrl+V na página, arrastar ou escolher).</p>
+        <p className="text-xs text-muted-foreground">Arquivo gerado pelo Odin (PDF em texto)</p>
       </div>
-
-      {imagem && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="flex items-center gap-2 text-base"><ImageIcon className="h-4 w-4" />Captura do pedido</CardTitle>
-            <Button size="sm" variant="ghost" onClick={() => setImagem((a) => { if (a) URL.revokeObjectURL(a.url); return null; })}><X className="mr-1 h-4 w-4" />Remover</Button>
-          </CardHeader>
-          <CardContent>
-            <img src={imagem.url} alt="Captura de tela do pedido" className="max-h-[480px] w-auto max-w-full rounded-md border object-contain" />
-            <p className="mt-2 text-xs text-muted-foreground">Itens, CEP e cliente foram lidos da imagem por OCR. Confira a tabela abaixo com a captura; itens marcados "conferir" tiveram leitura duvidosa.</p>
-          </CardContent>
-        </Card>
-      )}
 
       {pedido && (
         <>
@@ -246,14 +200,9 @@ function CubagemPage() {
                               onChange={(e) => setItens((l) => l.map((x, i) => (i === idx ? { ...x, qtd: parseInt(e.target.value, 10) || 0 } : x)))} />
                           </TableCell>
                           <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {!p ? <Badge className="border-transparent bg-danger-soft text-destructive">sem cadastro</Badge>
-                                : p.codigo_caixa === null ? <Badge className="border-transparent bg-warning-soft text-warning">sem caixa</Badge>
-                                : <Badge className="border-transparent bg-success-soft text-success">cadastrado</Badge>}
-                              {typeof it.confianca === "number" && it.confianca < CONFIANCA_MINIMA && (
-                                <Badge className="border-transparent bg-warning-soft text-warning" title={`Confiança da leitura: ${Math.round(it.confianca)}%`}>conferir</Badge>
-                              )}
-                            </div>
+                            {!p ? <Badge className="border-transparent bg-danger-soft text-destructive">sem cadastro</Badge>
+                              : p.codigo_caixa === null ? <Badge className="border-transparent bg-warning-soft text-warning">sem caixa</Badge>
+                              : <Badge className="border-transparent bg-success-soft text-success">cadastrado</Badge>}
                           </TableCell>
                           <TableCell>
                             <Button variant="ghost" size="icon" aria-label="Remover" onClick={() => setItens((l) => l.filter((_, i) => i !== idx))}><Trash2 className="h-4 w-4" /></Button>

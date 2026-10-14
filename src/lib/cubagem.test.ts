@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { calcular, lerItensTexto, mapCaixas, mapProdutos, paraJson, type CaixaRow, type ProdutoRow } from "./cubagem";
+import { calcular, lerItensTexto, mapCaixas, mapProdutos, paraJson, textoParaCliente, type CaixaRow, type ProdutoRow } from "./cubagem";
 import { parseCsv } from "./csv";
 
 const fx = (f: string) => readFileSync(path.resolve(__dirname, "../test/fixtures", f), "utf8");
@@ -56,5 +56,19 @@ describe("cubagem", () => {
     const r = run("CTKP-008IS:25");
     expect(r.quantidade_volumes).toBe(1);
     expect(r.volumes[0]).toMatchObject({ caixa: "Caixa Terciária PHS", dimensoes_cm: [56, 40, 28], peso_kg: 10.05, origem: "fornecedor_parcial" });
+  });
+  it("texto para o cliente começa pelo nome do cliente", () => {
+    const pedido = lerItensTexto("BM-FA0611:20");
+    pedido.cliente = "104 - EV MEDICA COMÉRCIO E DISTRIBUIÇÃO DE ARTIGOS MÉDICOS LTDA";
+    pedido.valor_total = 620;
+    expect(textoParaCliente(calcular(pedido, produtos, caixas)).split("\n")).toEqual([
+      "Cliente: 104 - EV MEDICA COMÉRCIO E DISTRIBUIÇÃO DE ARTIGOS MÉDICOS LTDA",
+      "Quantidade de volumes: 1",
+      "Peso: 1,99 kg",
+      "Dimensões: 68 x 26 x 20 cm",
+      "Valor da NF: R$ 620,00",
+    ]);
+    pedido.cliente = "";
+    expect(textoParaCliente(calcular(pedido, produtos, caixas)).startsWith("Quantidade de volumes: 1")).toBe(true);
   });
 });

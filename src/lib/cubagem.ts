@@ -43,8 +43,6 @@ export interface ItemPedido {
   qtd: number;
   valor_unit?: number | null;
   total?: number | null;
-  /** confiança da leitura por OCR (0-100); ausente quando veio do PDF ou foi digitado */
-  confianca?: number;
 }
 
 export interface Pedido {
@@ -563,6 +561,7 @@ export function textoParaCliente(res: Resultado): string {
     grupos.get(k)!.push(v);
   }
   const linhas: string[] = [];
+  if (p.cliente.trim()) linhas.push(`Cliente: ${p.cliente.trim()}`);
   linhas.push(`Quantidade de volumes: ${res.volumes.length}`);
   if (grupos.size === 1) {
     const [dims, vs] = [...grupos.entries()][0]!;
