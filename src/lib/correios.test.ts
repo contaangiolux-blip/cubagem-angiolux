@@ -4,7 +4,7 @@ import { avisosCorreios, dimsCorreios, fmtCep, pesoCubico, pesoParaCotacao, text
 
 const caixa = (codigo: number, nome: string, dims: [number, number, number]): Caixa => ({
   codigo, nome, peso: 0.5, dims, tipo: "terciaria", fornecedor: false,
-  itens_sec: null, itens_terc: null, secs_na_terc: null, terc_fornecedor: null, parcial_min: null, observacao: "",
+  itens_sec: null, itens_terc: null, secs_na_terc: null, terc_fornecedor: null, parcial_min: null, fragil: false, observacao: "",
 });
 const vol = (c: Caixa, peso: number): Volume => ({ caixa: c, origem: "angiolux", peso, conteudo: [], pacotes: [] });
 const produtoVazio: Produto = { codigo: "X", nome: "", peso: 0, codigo_caixa: null, fabricante: "" };

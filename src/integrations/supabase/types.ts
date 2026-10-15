@@ -22,6 +22,7 @@ export type Database = {
           caixas_secundarias_permitidas_na_terciaria: number | null
           codigo_caixa: number
           comprimento_cm: number
+          fragil: boolean
           largura_cm: number
           nome_caixa: string
           observacao: string | null
@@ -39,6 +40,7 @@ export type Database = {
           caixas_secundarias_permitidas_na_terciaria?: number | null
           codigo_caixa: number
           comprimento_cm?: number
+          fragil?: boolean
           largura_cm?: number
           nome_caixa: string
           observacao?: string | null
@@ -56,6 +58,7 @@ export type Database = {
           caixas_secundarias_permitidas_na_terciaria?: number | null
           codigo_caixa?: number
           comprimento_cm?: number
+          fragil?: boolean
           largura_cm?: number
           nome_caixa?: string
           observacao?: string | null

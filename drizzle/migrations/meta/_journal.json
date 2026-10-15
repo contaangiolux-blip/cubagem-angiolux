@@ -15,6 +15,13 @@
       "when": 1791913000000,
       "tag": "0001_cubagens_endereco",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792065600000,
+      "tag": "0002_caixas_renumeracao_fragil",
+      "breakpoints": true
     }
   ]
 }
