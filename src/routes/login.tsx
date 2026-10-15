@@ -3,6 +3,7 @@ import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Boxes } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { traduzirErroAuth } from "@/lib/authErros";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,10 +24,7 @@ export const Route = createFileRoute("/login")({
 });
 
 function traduzir(msg: string) {
-  if (/invalid login/i.test(msg)) return "E-mail ou senha incorretos.";
-  if (/already registered/i.test(msg)) return "Este e-mail já tem conta. Use a aba Entrar.";
-  if (/password/i.test(msg) && /(weak|pwned|leaked|characters)/i.test(msg)) return "Senha fraca ou vazada. Use pelo menos 8 caracteres e uma senha única.";
-  return msg;
+  return traduzirErroAuth(msg);
 }
 
 function LoginPage() {
@@ -67,14 +65,20 @@ function LoginPage() {
           className="w-full text-center text-sm text-muted-foreground underline-offset-4 hover:underline"
           disabled={busy}
           onClick={async () => {
-            if (!email) { toast.error("Digite seu e-mail para redefinir a senha."); return; }
+            const alvo = email.trim();
+            if (!alvo) { toast.error("Digite seu e-mail no campo acima para redefinir a senha."); return; }
             setBusy(true);
-            const { error } = await supabase.auth.resetPasswordForEmail(email, {
-              redirectTo: `${window.location.origin}/redefinir-senha`,
-            });
-            setBusy(false);
-            if (error) { toast.error(traduzir(error.message)); return; }
-            toast.success("Enviamos um link de redefinição para o seu e-mail.");
+            try {
+              const { error } = await supabase.auth.resetPasswordForEmail(alvo, {
+                redirectTo: `${window.location.origin}/redefinir-senha`,
+              });
+              if (error) { toast.error(traduzirErroAuth(error.message, error.code)); return; }
+              toast.success(`Link de redefinição enviado para ${alvo}. Verifique sua caixa de entrada e o spam.`);
+            } catch (err) {
+              toast.error(traduzirErroAuth(err instanceof Error ? err.message : String(err)));
+            } finally {
+              setBusy(false);
+            }
           }}
         >
           Esqueci minha senha
