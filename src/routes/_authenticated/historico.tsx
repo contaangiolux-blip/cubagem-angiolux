@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cubagensQuery, fmtDataHora, fmtNum, type CubagemDb } from "@/lib/data";
 import { DESCRICAO_ORIGEM, type Origem } from "@/lib/cubagem";
 import { copiar } from "@/lib/copiar";
+import { fmtCep } from "@/lib/correios";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +26,7 @@ export const Route = createFileRoute("/_authenticated/historico")({
   component: HistoricoPage,
 });
 
-type VolJson = { caixa: string; dimensoes_cm: number[]; peso_kg: number; m3: number; origem: Origem; conteudo: string[] };
+type VolJson = { codigo_caixa?: number; caixa: string; dimensoes_cm: number[]; peso_kg: number; m3: number; origem: Origem; conteudo: string[]; editado?: boolean };
 
 function HistoricoPage() {
   const qc = useQueryClient();
@@ -85,7 +86,7 @@ function HistoricoPage() {
             <>
               <DialogHeader>
                 <DialogTitle>Pedido {sel.pedido || "-"}</DialogTitle>
-                <DialogDescription>{sel.cliente} · {sel.data_pedido} · {sel.tipo_frete} · salvo em {fmtDataHora(sel.created_at)} por {sel.user_email}</DialogDescription>
+                <DialogDescription>{sel.cliente} · {sel.data_pedido} · {sel.tipo_frete}{sel.cep ? ` · CEP ${fmtCep(sel.cep)}${sel.cidade ? ` (${sel.cidade}${sel.uf ? "/" + sel.uf : ""})` : ""}` : ""} · salvo em {fmtDataHora(sel.created_at)} por {sel.user_email}</DialogDescription>
               </DialogHeader>
               <div className="space-y-2">
                 {((sel.volumes ?? []) as VolJson[]).map((v, i) => (
@@ -94,7 +95,9 @@ function HistoricoPage() {
                       <strong>#{i + 1}</strong>
                       <span className="font-mono">{v.dimensoes_cm.map((d) => String(d).replace(".", ",")).join(" x ")} cm</span>
                       <span>{fmtNum(v.peso_kg)} kg</span><span>{fmtNum(v.m3, 4)} m³</span>
+                      {v.codigo_caixa !== undefined && <span className="rounded-md bg-primary px-2 py-0.5 text-xs font-bold text-primary-foreground">Caixa {v.codigo_caixa}</span>}
                       <span className="font-medium">{v.caixa}</span>
+                      {v.editado && <Badge className="border-transparent bg-warning-soft text-warning">trocada manualmente</Badge>}
                       <Badge variant="secondary">{DESCRICAO_ORIGEM[v.origem] ?? v.origem}</Badge>
                     </div>
                     <ul className="mt-1 text-muted-foreground">{v.conteudo.map((t, k) => <li key={k}>{t}</li>)}</ul>

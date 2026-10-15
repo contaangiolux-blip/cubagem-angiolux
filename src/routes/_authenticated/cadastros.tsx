@@ -54,7 +54,8 @@ function CadastrosPage() {
     { key: "quantidade_itens_por_caixa_terciaria", label: "Un/terc.", kind: "int", min: 0 },
     { key: "caixas_secundarias_permitidas_na_terciaria", label: "Sec/terc.", kind: "int", min: 0 },
     { key: "caixa_terciaria_fornecedor", label: "Terc. fornecedor", kind: "select", options: caixas.filter((c) => c.tipo_caixa === "terciaria" && c.caixa_fornecedor).map(opt), className: "min-w-44" },
-    { key: "terciaria_parcial_minimo", label: "Parcial mín.", kind: "num", min: 0, max: 1 },
+    { key: "terciaria_parcial_minimo", label: "Mín. p/ usar original (0–1, vazio = sempre)", kind: "num", min: 0, max: 1 },
+    { key: "fragil", label: "Frágil (só com frágeis)", kind: "bool" },
     { key: "observacao", label: "Observação", kind: "text", className: "min-w-60" },
   ];
   const colsProduto: Coluna[] = [
