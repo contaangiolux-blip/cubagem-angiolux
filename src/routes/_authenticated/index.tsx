@@ -1,15 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useMemo, useRef, useState, type DragEvent } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Calculator, Copy, FileUp, Loader2, Plus, Save, Trash2, Eraser, PackageX, RotateCcw } from "lucide-react";
+import { AlertTriangle, Calculator, Copy, FileUp, Loader2, Plus, Save, Trash2, Eraser } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { caixasQuery, produtosQuery, fmtNum } from "@/lib/data";
 import {
-  calcular, caixasParaVolume, mapCaixas, mapProdutos, paraJson, textoParaCliente, trocarCaixa, dimsTxt, fmtKg, fmtBrl, m3Volume,
-  pesoTotal, m3Total, volumeCaixa, DESCRICAO_ORIGEM, type Caixa, type Pedido, type Resultado, type CaixaRow, type ProdutoRow,
+  calcular, mapCaixas, mapProdutos, paraJson, textoParaCliente, dimsTxt, fmtKg, fmtBrl, m3Volume,
+  pesoTotal, m3Total, DESCRICAO_ORIGEM, type Pedido, type Resultado, type CaixaRow, type ProdutoRow,
 } from "@/lib/cubagem";
-import { avisosCorreios, CEP_ORIGEM_ANGIOLUX, dimsCorreios, fmtCep, pesoCubico, pesoParaCotacao, textoParaCorreios } from "@/lib/correios";
 import { lerPedidoPdf } from "@/lib/lerPdf";
 import { copiar } from "@/lib/copiar";
 import { Button } from "@/components/ui/button";
@@ -31,30 +30,8 @@ export const Route = createFileRoute("/_authenticated/")({
   component: CubagemPage,
 });
 
-const vazio = (): Pedido => ({ numero: "", cliente: "", data: "", tipo_frete: "", valor_total: null, itens: [], cep: "", cidade: "", uf: "" });
+const vazio = (): Pedido => ({ numero: "", cliente: "", data: "", tipo_frete: "", valor_total: null, itens: [] });
 
-const ehPdf = (f: File) => f.type === "application/pdf" || f.name.toLowerCase().endsWith(".pdf");
-
-/** "Caixa Terciária Angiolux Pequena" -> "Angiolux Pequena" */
-const nomeCurto = (c: Caixa) => c.nome.replace(/^Caixa (Terciária|Secundária) /i, "");
-
-/** Caixas marcadas como "não tenho hoje": lembradas no navegador até o fim do dia. */
-const CHAVE_INDISP = "cubagem.indisponiveis";
-function lerIndisponiveis(): number[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(CHAVE_INDISP) ?? "null") as { dia: string; codigos: number[] } | null;
-    return v && v.dia === new Date().toDateString() ? v.codigos : [];
-  } catch {
-    return [];
-  }
-}
-function gravarIndisponiveis(codigos: number[]) {
-  try {
-    localStorage.setItem(CHAVE_INDISP, JSON.stringify({ dia: new Date().toDateString(), codigos }));
-  } catch {
-    /* navegador sem armazenamento: só não lembra */
-  }
-}
 
 function CubagemPage() {
   const cx = useQuery(caixasQuery);
@@ -63,21 +40,18 @@ function CubagemPage() {
   const produtos = useMemo(() => mapProdutos((pr.data ?? []) as ProdutoRow[]), [pr.data]);
 
   const [pedido, setPedido] = useState<Pedido | null>(null);
-  const [lendo, setLendo] = useState<string | null>(null);
+  const [lendo, setLendo] = useState(false);
   const [drag, setDrag] = useState(false);
   const [res, setRes] = useState<Resultado | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [novoCod, setNovoCod] = useState("");
   const [novaQtd, setNovaQtd] = useState("1");
-  const [indisponiveis, setIndisponiveis] = useState<number[]>([]);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setIndisponiveis(lerIndisponiveis()); }, []);
-
-  async function receber(file?: File | null) {
+  async function receber(file?: File) {
     if (!file) return;
-    if (!ehPdf(file)) { toast.error("Envie o PDF do espelho do pedido (arquivo .pdf gerado pelo Odin)."); return; }
-    setLendo("Lendo PDF...");
+    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) { toast.error("Envie um arquivo PDF."); return; }
+    setLendo(true);
     setRes(null);
     try {
       const p = await lerPedidoPdf(file);
@@ -88,24 +62,9 @@ function CubagemPage() {
       console.error(e);
       toast.error("Não foi possível ler o PDF.");
     } finally {
-      setLendo(null);
+      setLendo(false);
     }
   }
-
-  useEffect(() => {
-    // Ctrl+V de um arquivo PDF copiado (ex.: no Explorador de Arquivos)
-    function onPaste(e: ClipboardEvent) {
-      const alvo = e.target as HTMLElement | null;
-      if (alvo && (alvo.tagName === "INPUT" || alvo.tagName === "TEXTAREA")) return;
-      const arquivo = [...(e.clipboardData?.files ?? [])].find(ehPdf);
-      if (!arquivo) return;
-      e.preventDefault();
-      void receber(arquivo);
-    }
-    document.addEventListener("paste", onPaste);
-    return () => document.removeEventListener("paste", onPaste);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const upd = (patch: Partial<Pedido>) => { setPedido((p) => ({ ...(p ?? vazio()), ...patch })); setRes(null); };
   const setItens = (fn: (i: Pedido["itens"]) => Pedido["itens"]) => upd({ itens: fn(pedido?.itens ?? []) });
@@ -121,12 +80,7 @@ function CubagemPage() {
 
   function calc() {
     if (!pedido?.itens.length) { toast.error("Adicione ao menos um item."); return; }
-    setRes(calcular({ ...pedido, itens: pedido.itens.filter((i) => i.qtd > 0) }, produtos, caixas, undefined, { indisponiveis }));
-  }
-
-  function limpar() {
-    setPedido(vazio());
-    setRes(null);
+    setRes(calcular({ ...pedido, itens: pedido.itens.filter((i) => i.qtd > 0) }, produtos, caixas));
   }
 
   async function salvar() {
@@ -136,7 +90,6 @@ function CubagemPage() {
     const j = paraJson(res);
     const { error } = await supabase.from("cubagens").insert({
       pedido: res.pedido.numero, cliente: res.pedido.cliente, data_pedido: res.pedido.data, tipo_frete: res.pedido.tipo_frete,
-      cep: res.pedido.cep || null, cidade: res.pedido.cidade || null, uf: res.pedido.uf || null,
       valor_nf: res.pedido.valor_total, itens: j.itens, volumes: j.volumes, resultado: j, texto_cliente: textoParaCliente(res),
       quantidade_volumes: j.quantidade_volumes, peso_total_kg: j.peso_total_kg, m3_total: j.m3_total,
       user_id: u.user?.id ?? null, user_email: u.user?.email ?? null,
@@ -158,7 +111,7 @@ function CubagemPage() {
             {carregando ? "Carregando cadastros..." : erro ? "" : `${produtos.size} produtos e ${caixas.size} caixas cadastrados`}
           </p>
         </div>
-        <Button variant="outline" onClick={limpar}><Eraser className="mr-1 h-4 w-4" />Limpar</Button>
+        <Button variant="outline" onClick={() => { setPedido(vazio()); setRes(null); }}><Eraser className="mr-1 h-4 w-4" />Limpar</Button>
       </div>
       {erro && <div className="rounded-md border border-destructive/40 bg-danger-soft p-3 text-sm text-destructive">{(erro as Error).message}</div>}
 
@@ -166,12 +119,12 @@ function CubagemPage() {
         onClick={() => fileRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
         onDragLeave={() => setDrag(false)}
-        onDrop={(e: DragEvent) => { e.preventDefault(); setDrag(false); void receber(e.dataTransfer.files[0]); }}
+        onDrop={(e: DragEvent) => { e.preventDefault(); setDrag(false); receber(e.dataTransfer.files[0]); }}
         className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 text-center transition-colors ${drag ? "border-primary bg-accent" : "border-input bg-card hover:border-primary/60"}`}
       >
-        <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { void receber(e.target.files?.[0]); e.target.value = ""; }} />
+        <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { receber(e.target.files?.[0]); e.target.value = ""; }} />
         {lendo ? <Loader2 className="h-8 w-8 animate-spin text-primary" /> : <FileUp className="h-8 w-8 text-primary" />}
-        <p className="font-medium">{lendo ?? "Arraste o PDF do espelho do pedido ou clique para escolher"}</p>
+        <p className="font-medium">{lendo ? "Lendo PDF..." : "Arraste o PDF do espelho do pedido ou clique para escolher"}</p>
         <p className="text-xs text-muted-foreground">Arquivo gerado pelo Odin (PDF em texto)</p>
       </div>
 
@@ -179,21 +132,11 @@ function CubagemPage() {
         <>
           <Card>
             <CardHeader className="pb-3"><CardTitle className="text-base">Dados do pedido</CardTitle></CardHeader>
-            <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+            <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <Campo label="Nº do pedido" value={pedido.numero} onChange={(v) => upd({ numero: v })} />
-              <div className="lg:col-span-3"><Campo label="Cliente" value={pedido.cliente} onChange={(v) => upd({ cliente: v })} /></div>
+              <div className="lg:col-span-2"><Campo label="Cliente" value={pedido.cliente} onChange={(v) => upd({ cliente: v })} /></div>
               <Campo label="Data" value={pedido.data} onChange={(v) => upd({ data: v })} />
               <Campo label="Tipo de frete" value={pedido.tipo_frete} onChange={(v) => upd({ tipo_frete: v })} />
-              <div className="lg:col-span-2">
-                <Campo
-                  label="CEP de entrega"
-                  value={pedido.cep ?? ""}
-                  onChange={(v) => upd({ cep: v.replace(/\D/g, "").slice(0, 8) })}
-                  acao={pedido.cep ? <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => copiar(fmtCep(pedido.cep))}><Copy className="mr-1 h-4 w-4" />Copiar CEP</Button> : undefined}
-                />
-              </div>
-              <div className="lg:col-span-2"><Campo label="Cidade" value={pedido.cidade ?? ""} onChange={(v) => upd({ cidade: v })} /></div>
-              <Campo label="UF" value={pedido.uf ?? ""} onChange={(v) => upd({ uf: v.toUpperCase().slice(0, 2) })} />
               <Campo
                 label="Valor da NF (R$)"
                 value={pedido.valor_total === null ? "" : String(pedido.valor_total).replace(".", ",")}
@@ -260,40 +203,16 @@ function CubagemPage() {
         </>
       )}
 
-      {pedido && caixas.size > 0 && (
-        <CaixasIndisponiveis
-          caixas={caixas}
-          marcadas={indisponiveis}
-          onMudar={(cods) => {
-            setIndisponiveis(cods);
-            gravarIndisponiveis(cods);
-            if (res && pedido) setRes(calcular({ ...pedido, itens: pedido.itens.filter((i) => i.qtd > 0) }, produtos, caixas, undefined, { indisponiveis: cods }));
-          }}
-        />
-      )}
-
-      {res && (
-        <ResultadoView
-          res={res}
-          caixas={caixas}
-          onTrocar={(i, c) => setRes(trocarCaixa(res, i, c))}
-          onRefazer={calc}
-          onSalvar={salvar}
-          salvando={salvando}
-        />
-      )}
+      {res && <ResultadoView res={res} onSalvar={salvar} salvando={salvando} />}
     </div>
   );
 }
 
-function Campo({ label, value, onChange, acao }: { label: string; value: string; onChange: (v: string) => void; acao?: React.ReactNode }) {
+function Campo({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <div className="space-y-1">
       <Label className="text-xs text-muted-foreground">{label}</Label>
-      <div className="flex gap-2">
-        <Input value={value} onChange={(e) => onChange(e.target.value)} />
-        {acao}
-      </div>
+      <Input value={value} onChange={(e) => onChange(e.target.value)} />
     </div>
   );
 }
@@ -307,60 +226,11 @@ function Resumo({ titulo, valor }: { titulo: string; valor: string }) {
   );
 }
 
-function CaixasIndisponiveis({ caixas, marcadas, onMudar }: { caixas: Map<number, Caixa>; marcadas: number[]; onMudar: (c: number[]) => void }) {
-  const terciarias = [...caixas.values()].filter((c) => c.tipo === "terciaria");
-  const angiolux = terciarias.filter((c) => !c.fornecedor).sort((a, b) => a.codigo - b.codigo);
-  const fornecedor = terciarias.filter((c) => c.fornecedor).sort((a, b) => a.codigo - b.codigo);
-  const alternar = (cod: number) => onMudar(marcadas.includes(cod) ? marcadas.filter((c) => c !== cod) : [...marcadas, cod]);
-  const lista = (cs: Caixa[]) => (
-    <div className="flex flex-wrap gap-2">
-      {cs.map((c) => {
-        const fora = marcadas.includes(c.codigo);
-        return (
-          <button
-            key={c.codigo}
-            type="button"
-            onClick={() => alternar(c.codigo)}
-            title={fora ? "Marcada como indisponível hoje: clique para voltar a usar" : "Clique se não tiver esta caixa hoje"}
-            className={`rounded-md border px-2 py-1 text-xs transition-colors ${fora ? "border-destructive/50 bg-danger-soft text-destructive line-through" : "border-input bg-card hover:border-primary/60"}`}
-          >
-            <span className="font-semibold">{c.codigo}</span> · {nomeCurto(c)} <span className="text-muted-foreground">({dimsTxt(c)})</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-  return (
-    <details className="rounded-lg border bg-card p-4" open={marcadas.length > 0}>
-      <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-        <PackageX className="h-4 w-4" />Caixas que não tenho hoje{marcadas.length ? ` (${marcadas.length} marcada(s))` : ""}
-      </summary>
-      <div className="mt-3 space-y-3">
-        <p className="text-xs text-muted-foreground">Clique nas caixas em falta: o cálculo deixa de sugeri-las. A marcação vale até o fim do dia neste computador.</p>
-        <div><p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Angiolux</p>{lista(angiolux)}</div>
-        <div><p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Fornecedor (vazias para reaproveitar)</p>{lista(fornecedor)}</div>
-      </div>
-    </details>
-  );
-}
-
-function ResultadoView({ res, caixas, onTrocar, onRefazer, onSalvar, salvando }: {
-  res: Resultado;
-  caixas: Map<number, Caixa>;
-  onTrocar: (indice: number, caixa: Caixa) => void;
-  onRefazer: () => void;
-  onSalvar: () => void;
-  salvando: boolean;
-}) {
+function ResultadoView({ res, onSalvar, salvando }: { res: Resultado; onSalvar: () => void; salvando: boolean }) {
   const texto = textoParaCliente(res);
-  const editado = res.volumes.some((v) => v.editado);
-  const textoCorreios = textoParaCorreios(res);
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-xl font-semibold">Resultado</h2>
-        {editado && <Button size="sm" variant="outline" onClick={onRefazer}><RotateCcw className="mr-1 h-4 w-4" />Desfazer trocas de caixa</Button>}
-      </div>
+      <h2 className="text-xl font-semibold">Resultado</h2>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Resumo titulo="Volumes" valor={String(res.volumes.length)} />
         <Resumo titulo="Peso total" valor={`${fmtKg(pesoTotal(res))} kg`} />
@@ -381,34 +251,10 @@ function ResultadoView({ res, caixas, onTrocar, onRefazer, onSalvar, salvando }:
                   <TableCell>{fmtNum(m3Volume(v), 4)}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-md bg-primary px-2 py-0.5 text-sm font-bold text-primary-foreground" title="Número da caixa (etiqueta da prateleira)">Caixa {v.caixa.codigo}</span>
-                      <span className="font-medium">{nomeCurto(v.caixa)}</span>
+                      <span className="font-medium">{v.caixa.nome}</span>
                       <Badge variant="secondary">{DESCRICAO_ORIGEM[v.origem]}</Badge>
-                      {v.editado && <Badge className="border-transparent bg-warning-soft text-warning">trocada manualmente</Badge>}
                     </div>
                     <ul className="mt-1 space-y-0.5 text-sm text-muted-foreground">{v.conteudo.map((c, k) => <li key={k}>{c}</li>)}</ul>
-                    {v.pacotes.length > 0 && (
-                      <div className="mt-2 flex items-center gap-2">
-                        <Label htmlFor={`troca-${i}`} className="text-xs text-muted-foreground">Trocar caixa</Label>
-                        <select
-                          id={`troca-${i}`}
-                          className="h-8 max-w-md rounded-md border border-input bg-card px-2 text-xs"
-                          value={v.caixa.codigo}
-                          onChange={(e) => { const c = caixas.get(Number(e.target.value)); if (c) onTrocar(i, c); }}
-                        >
-                          {!caixasParaVolume(v, caixas).some((o) => o.caixa.codigo === v.caixa.codigo) && (
-                            <option value={v.caixa.codigo}>{v.caixa.codigo} · {nomeCurto(v.caixa)}</option>
-                          )}
-                          {caixasParaVolume(v, caixas)
-                            .sort((a, b) => Number(a.caixa.fornecedor) - Number(b.caixa.fornecedor) || volumeCaixa(a.caixa) - volumeCaixa(b.caixa))
-                            .map((o) => (
-                              <option key={o.caixa.codigo} value={o.caixa.codigo}>
-                                {o.caixa.codigo} · {nomeCurto(o.caixa)} · {dimsTxt(o.caixa)} · ocupa {Math.round(o.ocupacao * 100)}%{o.apertada ? " (apertada: conferir)" : ""}
-                              </option>
-                            ))}
-                        </select>
-                      </div>
-                    )}
                   </TableCell>
                 </TableRow>
               ))}
@@ -436,49 +282,6 @@ function ResultadoView({ res, caixas, onTrocar, onRefazer, onSalvar, salvando }:
           <Button size="sm" variant="outline" onClick={() => copiar(texto)}><Copy className="mr-1 h-4 w-4" />Copiar</Button>
         </CardHeader>
         <CardContent><pre className="whitespace-pre-wrap rounded-md bg-muted p-4 font-mono text-sm">{texto}</pre></CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-base">Dados para cotação nos Correios (SEDEX contrato)</CardTitle>
-          <div className="flex gap-2">
-            {res.pedido.cep && <Button size="sm" variant="outline" onClick={() => copiar(fmtCep(res.pedido.cep))}><Copy className="mr-1 h-4 w-4" />Copiar CEP</Button>}
-            <Button size="sm" variant="outline" onClick={() => copiar(textoCorreios)}><Copy className="mr-1 h-4 w-4" />Copiar tudo</Button>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <p className="text-sm">
-            <span className="text-muted-foreground">Origem</span> <span className="font-mono">{fmtCep(CEP_ORIGEM_ANGIOLUX)}</span>
-            <span className="mx-2 text-muted-foreground">→</span>
-            <span className="text-muted-foreground">Destino</span>{" "}
-            {res.pedido.cep ? <span className="font-mono font-semibold">{fmtCep(res.pedido.cep)}</span> : <span className="text-warning">CEP não informado</span>}
-            {res.pedido.cidade && <span className="text-muted-foreground"> · {res.pedido.cidade}{res.pedido.uf ? `/${res.pedido.uf}` : ""}</span>}
-          </p>
-          <Table>
-            <TableHeader><TableRow><TableHead className="w-10">Nº</TableHead><TableHead>C x L x A (cm)</TableHead><TableHead>Peso real</TableHead><TableHead>Peso cúbico</TableHead><TableHead>Peso p/ cotação</TableHead><TableHead>Observação</TableHead></TableRow></TableHeader>
-            <TableBody>
-              {res.volumes.map((v, i) => {
-                const [c, l, a] = dimsCorreios(v);
-                const av = avisosCorreios(v);
-                return (
-                  <TableRow key={i}>
-                    <TableCell className="font-semibold">{i + 1}</TableCell>
-                    <TableCell className="whitespace-nowrap font-mono text-sm">{c} x {l} x {a}</TableCell>
-                    <TableCell className="whitespace-nowrap">{fmtKg(v.peso)} kg</TableCell>
-                    <TableCell className="whitespace-nowrap">{fmtKg(pesoCubico(v))} kg</TableCell>
-                    <TableCell className="whitespace-nowrap font-semibold">{fmtKg(pesoParaCotacao(v))} kg</TableCell>
-                    <TableCell className="text-sm">
-                      {av.length ? <span className="text-destructive">Fora dos limites de SEDEX/PAC: {av.join("; ")}</span>
-                        : pesoCubico(v) > v.peso ? <span className="text-muted-foreground">cobrado pelo peso cúbico (caixa grande para o conteúdo)</span>
-                        : <span className="text-muted-foreground">cobrado pelo peso real</span>}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-          <p className="text-xs text-muted-foreground">Os Correios cobram o maior entre o peso real e o peso cúbico (C x L x A ÷ 6000). Limites de SEDEX/PAC: cada lado até 100 cm, soma até 200 cm, até 30 kg.</p>
-        </CardContent>
       </Card>
 
       <div className="flex justify-end">

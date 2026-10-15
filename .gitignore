@@ -33,6 +33,3 @@ dist-ssr
 
 # lockfile do npm (o projeto usa bun no Lovable)
 package-lock.json
-
-# cache de idioma do Tesseract (testes)
-/*.traineddata

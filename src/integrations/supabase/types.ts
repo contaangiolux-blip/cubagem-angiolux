@@ -75,7 +75,6 @@ export type Database = {
         Row: {
           cep: string | null
           cidade: string | null
-          uf: string | null
           cliente: string | null
           created_at: string | null
           data_pedido: string | null
@@ -88,6 +87,7 @@ export type Database = {
           resultado: Json | null
           texto_cliente: string | null
           tipo_frete: string | null
+          uf: string | null
           user_email: string | null
           user_id: string | null
           valor_nf: number | null
@@ -96,7 +96,6 @@ export type Database = {
         Insert: {
           cep?: string | null
           cidade?: string | null
-          uf?: string | null
           cliente?: string | null
           created_at?: string | null
           data_pedido?: string | null
@@ -109,6 +108,7 @@ export type Database = {
           resultado?: Json | null
           texto_cliente?: string | null
           tipo_frete?: string | null
+          uf?: string | null
           user_email?: string | null
           user_id?: string | null
           valor_nf?: number | null
@@ -117,7 +117,6 @@ export type Database = {
         Update: {
           cep?: string | null
           cidade?: string | null
-          uf?: string | null
           cliente?: string | null
           created_at?: string | null
           data_pedido?: string | null
@@ -130,6 +129,7 @@ export type Database = {
           resultado?: Json | null
           texto_cliente?: string | null
           tipo_frete?: string | null
+          uf?: string | null
           user_email?: string | null
           user_id?: string | null
           valor_nf?: number | null

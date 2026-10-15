@@ -1,11 +1,11 @@
 /**
- * Leitura do espelho do pedido (sistema Odin) a partir de palavras posicionadas — porte de
- * ler_pedido_pdf() do protótipo Python.
+ * Leitura do espelho do pedido (PDF do sistema Odin) com pdf.js — porte de ler_pedido_pdf().
  * Estratégia: agrupa as palavras em linhas pela coordenada y (origem no topo), localiza o
  * cabeçalho "Código / Descrição / QTD / Valor / Total" e atribui cada palavra a uma coluna
- * pela posição x. Captura nº do pedido, cliente, data, tipo de frete, CEP/cidade/UF e TOTAL.
+ * pela posição x. Captura nº do pedido, cliente, data, tipo de frete e TOTAL.
  *
- * `lerPedidoDeLinhas` compara rótulos sem acento e sem diferenciar maiúsculas.
+ * Recebe o resultado de page.getTextContent() de cada página (pdfjs-dist) para não depender
+ * do ambiente (navegador ou Node). No app: usar `getDocument({ data }).promise`.
  */
 import type { Pedido, ItemPedido } from "./cubagem";
 
@@ -46,13 +46,13 @@ export function extrairPalavras(pag: PaginaTexto): Array<Palavra & { y: number }
   return out;
 }
 
-/** Agrupa palavras em linhas (tolerância em y), ordenadas de cima para baixo e por x. */
-export function agruparLinhas(palavras: Array<Palavra & { y: number }>, tolerancia = 2.5): Palavra[][] {
+/** Agrupa palavras em linhas (tolerância de 2.5 pt em y), ordenadas de cima para baixo e por x. */
+export function agruparLinhas(palavras: Array<Palavra & { y: number }>): Palavra[][] {
   const ordenadas = [...palavras].sort((a, b) => a.y - b.y || a.x0 - b.x0);
   const linhas: Array<{ y: number; ws: Palavra[] }> = [];
   for (const p of ordenadas) {
     const ult = linhas[linhas.length - 1];
-    if (ult && Math.abs(p.y - ult.y) <= tolerancia) ult.ws.push(p);
+    if (ult && Math.abs(p.y - ult.y) <= 2.5) ult.ws.push(p);
     else linhas.push({ y: p.y, ws: [p] });
   }
   return linhas.map((l) => l.ws.sort((a, b) => a.x0 - b.x0));
@@ -64,152 +64,77 @@ export function paraFloatBr(s: string): number | null {
   return t === "" || !Number.isFinite(f) ? null : f;
 }
 
-/** Normaliza um rótulo para comparação tolerante (sem acentos, minúsculas, só letras/dígitos/":"). */
-export function normalizarRotulo(s: string): string {
-  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9:]/g, "");
-}
-
-export interface Colunas {
-  /** índice da linha do cabeçalho */
-  idx: number;
-  qtd: number;
-  valor: number;
-  total: number;
-  /** x0 do cabeçalho "Descrição" (quando lido) */
-  descricao?: number;
-  /** margem de tolerância para atribuir palavras às colunas */
-  margem: number;
-  /** palavras com x0 abaixo disso pertencem à coluna Código */
-  limiteCodigo: number;
-}
-
-/** Localiza o cabeçalho "Código / Descrição / QTD / Valor / Total" e as posições das colunas. */
-export function localizarCabecalho(rows: Palavra[][]): Colunas | null {
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]!;
-    const acha = (pred: (n: string) => boolean) => row.find((p) => pred(normalizarRotulo(p.w)));
-    const qtd = acha((n) => n === "qtd");
-    const valor = acha((n) => n === "valor");
-    const total = acha((n) => n === "total");
-    if (!qtd || !valor || !total || !(qtd.x0 < valor.x0 && valor.x0 < total.x0)) continue;
-    const desc = acha((n) => n.startsWith("descri"));
-    const margem = Math.max(4, 0.27 * (valor.x0 - qtd.x0));
-    const primeiro = row[0]!.x0;
-    const limiteCodigo = desc ? desc.x0 - margem : primeiro + 0.15 * (qtd.x0 - primeiro);
-    const col: Colunas = { idx: i, qtd: qtd.x0, valor: valor.x0, total: total.x0, margem, limiteCodigo };
-    if (desc) col.descricao = desc.x0;
-    return col;
-  }
-  return null;
-}
-
-const RE_DATA = /^\d{2}\/\d{2}\/\d{4}$/;
-
-/** Monta o pedido a partir das linhas de palavras. `colunas` substitui a detecção do cabeçalho. */
-export function lerPedidoDeLinhas(rows: Palavra[][], pedido?: Pedido, colunas?: Colunas | null): Pedido {
-  const p: Pedido = pedido ?? { numero: "", cliente: "", data: "", tipo_frete: "", valor_total: null, itens: [], cep: "", cidade: "", uf: "" };
-  const col = colunas ?? localizarCabecalho(rows);
-
-  for (const row of rows) {
-    const textos = row.map((w) => w.w);
-    const normais = textos.map(normalizarRotulo);
-
-    if (!p.numero && textos.length <= 4 && normais.includes("pedido")) {
-      const num = textos.find((t) => /^\d{3,8}$/.test(t));
-      if (num) p.numero = num;
-    }
-    if (!p.cliente && normais[0] === "cliente:") {
-      p.cliente = textos.slice(1).join(" ").replace(/^[\s-]+|[\s-]+$/g, "");
-    }
-    if (!p.data && normais.includes("data:")) {
-      const j = normais.indexOf("data:");
-      const d = textos[j + 1] ?? "";
-      if (RE_DATA.test(d)) p.data = d;
-    }
-    if (!p.tipo_frete && normais.includes("frete:") && normais.some((n) => n.startsWith("tipo"))) {
-      const j = normais.indexOf("frete:");
-      const f = (textos[j + 1] ?? "").replace(/[^A-Za-z]/g, "").toUpperCase();
-      if (f) p.tipo_frete = f;
-    }
-    if (!p.cep && normais.includes("cep:")) {
-      const j = normais.indexOf("cep:");
-      const cep = (textos[j + 1] ?? "").replace(/\D/g, "");
-      if (cep.length === 8) p.cep = cep;
-    }
-    if (!p.cidade && normais[0] === "cidade:") {
-      // "CIDADE: FORTALEZA - CE    BAIRRO: CENTRO"
-      const fim = normais.indexOf("bairro:");
-      const partes = textos.slice(1, fim === -1 ? undefined : fim);
-      const sep = partes.lastIndexOf("-");
-      if (sep > 0 && sep === partes.length - 2) {
-        p.cidade = partes.slice(0, sep).join(" ");
-        p.uf = partes[sep + 1] ?? "";
-      } else if (partes.length >= 2 && /^[A-Z]{2}$/.test(partes[partes.length - 1] ?? "")) {
-        p.cidade = partes.slice(0, -1).join(" ");
-        p.uf = partes[partes.length - 1]!;
-      } else {
-        p.cidade = partes.join(" ");
-      }
-    }
-    if (p.valor_total === null && textos.length === 2 && normais[0] === "total:") {
-      p.valor_total = paraFloatBr(textos[1]!);
-    }
-  }
-
-  if (!col) return p;
-
-  // itens: linhas abaixo do cabeçalho até a seção de VALORES (ou o rodapé da página)
-  for (const row of rows.slice(col.idx + 1)) {
-    const normais = row.map((w) => normalizarRotulo(w.w));
-    if (normais.includes("valores") || normais.includes("mercadoria:")) break;
-    if (normais.includes("impresso") || (normais.includes("sistema") && normais.some((n) => n.startsWith("odin")))) break;
-    const codigo: Palavra[] = [], desc: Palavra[] = [], qtd: Palavra[] = [], valor: Palavra[] = [], total: Palavra[] = [];
-    for (const w of row) {
-      if (w.x0 >= col.total - col.margem) total.push(w);
-      else if (w.x0 >= col.valor - col.margem) valor.push(w);
-      else if (w.x0 >= col.qtd - col.margem) qtd.push(w);
-      else if (w.x0 < col.limiteCodigo) codigo.push(w);
-      else desc.push(w);
-    }
-    const txt = (ws: Palavra[], sep = "") => ws.map((w) => w.w).join(sep);
-    const qtdTxt = txt(qtd);
-    if (codigo.length && /^\d+$/.test(qtdTxt)) {
-      const item: ItemPedido = {
-        codigo: txt(codigo, " ").trim(),
-        descricao: txt(desc, " ").trim(),
-        qtd: parseInt(qtdTxt, 10),
-        valor_unit: valor.length ? paraFloatBr(txt(valor)) : null,
-        total: total.length ? paraFloatBr(txt(total)) : null,
-      };
-      p.itens.push(item);
-    } else if (desc.length && p.itens.length && !codigo.length && !qtd.length) {
-      // continuação de descrição quebrada em 2 linhas
-      p.itens[p.itens.length - 1]!.descricao += " " + txt(desc, " ");
-    }
-  }
-  return p;
-}
-
-/**
- * Lê todas as páginas. A partir da 2ª página o Odin não repete o cabeçalho da tabela de itens:
- * nesse caso usamos as colunas da página anterior, com os itens começando logo abaixo do
- * título "PEDIDO" do topo da página.
- */
 export function lerPedidoDePaginas(paginas: PaginaTexto[]): Pedido {
-  let pedido: Pedido | undefined;
-  let colAnterior: Colunas | null = null;
+  const pedido: Pedido = { numero: "", cliente: "", data: "", tipo_frete: "", valor_total: null, itens: [] };
+
   for (const pag of paginas) {
     const rows = agruparLinhas(extrairPalavras(pag));
-    let col = localizarCabecalho(rows);
-    const anterior = colAnterior as Colunas | null;
-    if (!col && anterior) {
-      const titulo = rows.findIndex((r) => r.length === 1 && normalizarRotulo(r[0]!.w) === "pedido");
-      col = { ...anterior, idx: titulo };
+
+    // cabeçalho da tabela de itens -> posições das colunas
+    let col: { qtd: number; valor: number; total: number } | null = null;
+    let idxHeader = -1;
+    for (let i = 0; i < rows.length; i++) {
+      const textos = rows[i]!.map((p) => p.w);
+      if (textos.includes("QTD") && textos.includes("Valor") && textos.includes("Total")) {
+        const pos = (w: string) => rows[i]!.find((p) => p.w === w)!.x0;
+        col = { qtd: pos("QTD"), valor: pos("Valor"), total: pos("Total") };
+        idxHeader = i;
+        break;
+      }
     }
-    pedido = lerPedidoDeLinhas(rows, pedido, col);
-    if (col) colAnterior = col;
+
+    for (const row of rows) {
+      const textos = row.map((p) => p.w);
+      if (!pedido.numero && textos.length === 2 && textos[0] === "PEDIDO" && /^\d+$/.test(textos[1] ?? "")) {
+        pedido.numero = textos[1]!;
+      }
+      if (!pedido.cliente && textos.length && textos[0] === "CLIENTE:") {
+        pedido.cliente = textos.slice(1).join(" ").replace(/^[\s-]+|[\s-]+$/g, "");
+      }
+      if (!pedido.data && textos.includes("DATA:")) {
+        const j = textos.indexOf("DATA:");
+        if (j + 1 < textos.length) pedido.data = textos[j + 1]!;
+      }
+      if (!pedido.tipo_frete && textos.includes("FRETE:") && textos.includes("TIPO")) {
+        const j = textos.indexOf("FRETE:");
+        if (j + 1 < textos.length) pedido.tipo_frete = textos[j + 1]!;
+      }
+      if (pedido.valor_total === null && textos.length === 2 && textos[0] === "TOTAL:") {
+        pedido.valor_total = paraFloatBr(textos[1]!);
+      }
+    }
+
+    if (!col) continue;
+
+    // itens: linhas abaixo do cabeçalho até a seção de VALORES
+    for (const row of rows.slice(idxHeader + 1)) {
+      const textos = row.map((p) => p.w);
+      if (textos.includes("VALORES") || textos.includes("MERCADORIA:")) break;
+      const codigo: string[] = [], desc: string[] = [], qtd: string[] = [], valor: string[] = [], total: string[] = [];
+      for (const { x0, w } of row) {
+        if (x0 >= col.total - 15) total.push(w);
+        else if (x0 >= col.valor - 15) valor.push(w);
+        else if (x0 >= col.qtd - 15) qtd.push(w);
+        else if (x0 < 60) codigo.push(w);
+        else desc.push(w);
+      }
+      const qtdTxt = qtd.join("");
+      if (codigo.length && /^\d+$/.test(qtdTxt)) {
+        const item: ItemPedido = {
+          codigo: codigo.join(" ").trim(),
+          descricao: desc.join(" ").trim(),
+          qtd: parseInt(qtdTxt, 10),
+          valor_unit: valor.length ? paraFloatBr(valor.join("")) : null,
+          total: total.length ? paraFloatBr(total.join("")) : null,
+        };
+        pedido.itens.push(item);
+      } else if (desc.length && pedido.itens.length && !codigo.length && !qtd.length) {
+        // continuação de descrição quebrada em 2 linhas
+        pedido.itens[pedido.itens.length - 1]!.descricao += " " + desc.join(" ");
+      }
+    }
   }
-  return pedido ?? lerPedidoDeLinhas([]);
+  return pedido;
 }
 
 /**

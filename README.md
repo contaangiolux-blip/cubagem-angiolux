@@ -20,32 +20,18 @@ texto pronto para o cliente cotar o frete (FOB / Correios).
 
 ## Lógica do cálculo (`src/lib/cubagem.ts`)
 
-Nasceu como porte do protótipo Python (`cubagem.py`) e foi ajustada com o uso na expedição:
+Porte fiel do protótipo Python (`cubagem.py`, pasta Estoque/Cálculo de frete/Cubagem):
 
-1. Cada item enche as caixas originais do fornecedor que conseguir (caixa cheia de um produto só).
-2. O que sobra vira secundárias: cheias + no máximo uma parcial por item.
-3. As sobras de todos os itens que usam a mesma caixa do fornecedor vão juntas para a caixa
-   original, mesmo incompleta (economia de caixas compradas). O espaço livre recebe secundárias de
-   outros produtos que caibam. Opcional: em Cadastros, "Mín. p/ usar original" define, por caixa,
-   a fração mínima para usar a original; vazio = sempre.
-4. O que não couber em caixa de fornecedor vai para as caixas Angiolux: a menor que comporta tudo
-   (85% de aproveitamento e checagem de dimensões); senão várias, reduzidas para a menor possível.
-
-- Secundárias marcadas como **frágeis** (balões Simeks e Simvalve) só dividem caixa com outras frágeis.
-- As secundárias de um mesmo produto ficam juntas sempre que possível.
-- **Caixas que não tenho hoje:** na tela Cubagem, marcar uma caixa em falta tira ela do cálculo.
-- **Trocar caixa:** cada volume do resultado tem uma lista com as caixas em que o conteúdo cabe;
-  o app recalcula peso, m³ e textos, e o histórico guarda a versão editada.
+1. Caixa terciária original do fornecedor cheia.
+2. Caixa original incompleta quando atinge a fração mínima (`terciaria_parcial_minimo`,
+   hoje 60% para Simeks, PHS e Sinapi, cujas secundárias são lacradas).
+3. Secundárias cheias + no máximo uma parcial por item.
+4. Consolidação das secundárias soltas em caixas terciárias Angiolux: menor caixa que
+   comporta tudo (85% de aproveitamento e checagem de dimensões); senão várias caixas
+   (First Fit Decreasing) reduzidas depois para a menor possível. A terciária do próprio
+   fornecedor também é candidata.
 
 Peso de cada volume = produtos + secundárias + terciária.
-
-### Numeração das caixas
-
-| faixa | caixas |
-|---|---|
-| 1 a 9 | caixas Angiolux, da menor para a maior (número da etiqueta na prateleira) |
-| 17 a 32 | caixas originais dos fornecedores |
-| 101 a 117 | caixas secundárias |
 
 ## Banco de dados
 
@@ -58,7 +44,7 @@ usuários autenticados (RLS).
 ```bash
 npm install
 npm run dev      # servidor local
-npm test         # vitest: motor, leitura do PDF (inclusive várias páginas) e apoio aos Correios
+npm test         # vitest: motor (6 casos de referência) e leitura do PDF de exemplo
 npm run build    # build de produção
 ```
 
