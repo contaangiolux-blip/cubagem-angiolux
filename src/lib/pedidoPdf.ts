@@ -158,10 +158,11 @@ export function lerPedidoDeLinhas(rows: Palavra[][], pedido?: Pedido, colunas?: 
 
   if (!col) return p;
 
-  // itens: linhas abaixo do cabeçalho até a seção de VALORES
+  // itens: linhas abaixo do cabeçalho até a seção de VALORES (ou o rodapé da página)
   for (const row of rows.slice(col.idx + 1)) {
     const normais = row.map((w) => normalizarRotulo(w.w));
     if (normais.includes("valores") || normais.includes("mercadoria:")) break;
+    if (normais.includes("impresso") || (normais.includes("sistema") && normais.some((n) => n.startsWith("odin")))) break;
     const codigo: Palavra[] = [], desc: Palavra[] = [], qtd: Palavra[] = [], valor: Palavra[] = [], total: Palavra[] = [];
     for (const w of row) {
       if (w.x0 >= col.total - col.margem) total.push(w);
@@ -189,10 +190,24 @@ export function lerPedidoDeLinhas(rows: Palavra[][], pedido?: Pedido, colunas?: 
   return p;
 }
 
+/**
+ * Lê todas as páginas. A partir da 2ª página o Odin não repete o cabeçalho da tabela de itens:
+ * nesse caso usamos as colunas da página anterior, com os itens começando logo abaixo do
+ * título "PEDIDO" do topo da página.
+ */
 export function lerPedidoDePaginas(paginas: PaginaTexto[]): Pedido {
   let pedido: Pedido | undefined;
+  let colAnterior: Colunas | null = null;
   for (const pag of paginas) {
-    pedido = lerPedidoDeLinhas(agruparLinhas(extrairPalavras(pag)), pedido);
+    const rows = agruparLinhas(extrairPalavras(pag));
+    let col = localizarCabecalho(rows);
+    const anterior = colAnterior as Colunas | null;
+    if (!col && anterior) {
+      const titulo = rows.findIndex((r) => r.length === 1 && normalizarRotulo(r[0]!.w) === "pedido");
+      col = { ...anterior, idx: titulo };
+    }
+    pedido = lerPedidoDeLinhas(rows, pedido, col);
+    if (col) colAnterior = col;
   }
   return pedido ?? lerPedidoDeLinhas([]);
 }
