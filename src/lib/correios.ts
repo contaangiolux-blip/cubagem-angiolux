@@ -3,7 +3,7 @@
  * peso cúbico e texto resumido para copiar no simulador dos Correios.
  * A consulta de preço pela API oficial entra numa etapa posterior (função de backend).
  */
-import { fmtKg, type Resultado, type Volume } from "./cubagem";
+import { agruparVolumes, faixaVolumes, fmtKg, type Resultado, type Volume } from "./cubagem";
 
 /** CEP da Angiolux (origem das postagens). */
 export const CEP_ORIGEM_ANGIOLUX = "90035120";
@@ -47,12 +47,15 @@ export function textoParaCorreios(res: Resultado): string {
   const linhas: string[] = [];
   linhas.push(`CEP origem: ${fmtCep(CEP_ORIGEM_ANGIOLUX)}`);
   linhas.push(`CEP destino: ${p.cep ? fmtCep(p.cep) : "(não informado)"}${p.cidade ? ` - ${p.cidade}${p.uf ? "/" + p.uf : ""}` : ""}`);
-  res.volumes.forEach((v, i) => {
+  for (const g of agruparVolumes(res.volumes)) {
+    const v = g.volume;
     const [c, l, a] = dimsCorreios(v);
-    let linha = `Volume ${i + 1}: ${c} x ${l} x ${a} cm, ${fmtKg(v.peso)} kg (peso cúbico ${fmtKg(pesoCubico(v))} kg)`;
+    const n = g.indices.length;
+    let linha = `${n > 1 ? `Volumes ${faixaVolumes(g.indices)} (${n} iguais)` : `Volume ${faixaVolumes(g.indices)}`}: ` +
+      `${c} x ${l} x ${a} cm, ${fmtKg(v.peso)} kg${n > 1 ? " cada" : ""} (peso cúbico ${fmtKg(pesoCubico(v))} kg)`;
     const av = avisosCorreios(v);
     if (av.length) linha += ` - ATENÇÃO: ${av.join("; ")}`;
     linhas.push(linha);
-  });
+  }
   return linhas.join("\n");
 }

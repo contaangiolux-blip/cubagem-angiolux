@@ -2,10 +2,11 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  caixasParaVolume, calcular, lerItensTexto, mapCaixas, mapProdutos, paraJson, textoParaCliente, trocarCaixa,
+  agruparVolumes, caixasParaVolume, calcular, faixaVolumes, lerItensTexto, mapCaixas, mapProdutos, paraJson, textoParaCliente, trocarCaixa,
   type Caixa, type CaixaRow, type ProdutoRow,
 } from "./cubagem";
 import { parseCsv } from "./csv";
+import { textoParaCorreios } from "./correios";
 
 const fx = (f: string) => readFileSync(path.resolve(__dirname, "../test/fixtures", f), "utf8");
 const caixas = mapCaixas(parseCsv(fx("caixas.csv")) as unknown as CaixaRow[]);
@@ -24,7 +25,7 @@ describe("caixa original do fornecedor (sempre que houver)", () => {
     expect(r.quantidade_volumes).toBe(2);
     expect(r.volumes[0]).toMatchObject({ codigo_caixa: 17, dimensoes_cm: [45, 31, 58], peso_kg: 7.86, origem: "fornecedor" });
     expect(r.volumes[1]).toMatchObject({ codigo_caixa: 17, origem: "fornecedor_parcial", peso_kg: 3.636 });
-    expect(r.volumes[1]!.conteudo).toContain("4x Caixa Secundária Introdutores Shunmei (3 cheia(s) + 1 parcial c/ 7 un) = 37 un 615601");
+    expect(r.volumes[1]!.conteudo).toContain("37 un 615601 (3 cx cheias + 1 com 7 un)");
     expect(r.peso_total_kg).toBe(11.496);
   });
 
@@ -32,11 +33,11 @@ describe("caixa original do fornecedor (sempre que houver)", () => {
     const r = run("615501:80,615601:110");
     const shunmei = r.volumes.filter((v) => v.codigo_caixa === 17);
     expect(shunmei).toHaveLength(2);
-    expect(shunmei[0]).toMatchObject({ origem: "fornecedor", conteudo: ["100 un 615601 em 10 cx secundárias (caixa original cheia)"] });
+    expect(shunmei[0]).toMatchObject({ origem: "fornecedor", conteudo: ["100 un 615601 (10 cx secundárias)"] });
     expect(shunmei[1]!.origem).toBe("fornecedor_parcial");
     expect(shunmei[1]!.conteudo.slice(0, 2)).toEqual([
-      "8x Caixa Secundária Introdutores Shunmei = 80 un 615501",
-      "1x Caixa Secundária Introdutores Shunmei = 10 un 615601",
+      "80 un 615501 (8 cx secundárias)",
+      "10 un 615601 (1 cx secundária)",
     ]);
     expect(r.quantidade_volumes).toBe(2);
   });
@@ -95,7 +96,7 @@ describe("balões, produtos inteiros e caixas indisponíveis", () => {
       "SND250120-150:10,SND250150-150:7,SND25080-150:7,SND300100-150:2,SND300120-150:6,SND30060-150:2,SND30080-150:2";
     const r = run(itens);
     expect(r.volumes.filter((v) => v.codigo_caixa === 29)).toHaveLength(3);
-    const codigos = r.volumes.flatMap((v) => v.conteudo.map((c) => c.match(/un (\S+)$/)?.[1]).filter(Boolean));
+    const codigos = r.volumes.flatMap((v) => v.conteudo.map((c) => c.match(/^\d+ un (\S+)/)?.[1]).filter(Boolean));
     const repetidos = codigos.filter((c, i) => codigos.indexOf(c) !== i);
     expect(repetidos.length).toBeLessThanOrEqual(1);
   });
@@ -104,7 +105,7 @@ describe("balões, produtos inteiros e caixas indisponíveis", () => {
     const r = run("615601:137", [17]);
     expect(r.volumes.every((v) => v.codigo_caixa !== 17)).toBe(true);
     expect(r.volumes.every((v) => v.origem === "angiolux")).toBe(true);
-    const un = r.volumes.flatMap((v) => v.conteudo).join(" ").match(/= (\d+) un 615601/g)!.reduce((s, m) => s + Number(m.match(/\d+/)![0]), 0);
+    const un = r.volumes.flatMap((v) => v.conteudo).join(" ¦ ").match(/(\d+) un 615601/g)!.reduce((s, m) => s + Number(m.match(/\d+/)![0]), 0);
     expect(un).toBe(137);
   });
 });
@@ -121,6 +122,23 @@ describe("edição manual da caixa", () => {
     expect(novo.volumes[0]).toMatchObject({ origem: "angiolux", editado: true });
     expect(paraJson(novo).volumes[0]).toMatchObject({ codigo_caixa: 2, peso_kg: 1.99, editado: true });
     expect(res.volumes[0]!.caixa.codigo).toBe(19); // original intacto
+  });
+});
+
+describe("resumo dos volumes", () => {
+  it("balão (1 un por secundária) aparece só como quantidade e código", () => {
+    const r = run("SND250150-150:7,SND25080-150:7");
+    expect(r.volumes[0]!.conteudo.slice(0, 2)).toEqual(["7 un SND250150-150", "7 un SND25080-150"]);
+  });
+
+  it("volumes iguais seguidos viram um grupo", () => {
+    const res = calcular(lerItensTexto("30100215:200,615601:5"), produtos, caixas);
+    const grupos = agruparVolumes(res.volumes);
+    const dil = grupos.find((g) => g.volume.caixa.codigo === 24)!;
+    expect(dil.indices).toHaveLength(10);
+    expect(faixaVolumes(dil.indices)).toMatch(/^\d+ a \d+$/);
+    expect(grupos).toHaveLength(2);
+    expect(textoParaCorreios(res)).toContain("(10 iguais): 55 x 40 x 36 cm, 9,09 kg cada");
   });
 });
 

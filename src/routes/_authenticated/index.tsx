@@ -6,7 +6,7 @@ import { AlertTriangle, Calculator, Copy, FileUp, Loader2, Plus, Save, Trash2, E
 import { supabase } from "@/integrations/supabase/client";
 import { caixasQuery, produtosQuery, fmtNum } from "@/lib/data";
 import {
-  calcular, caixasParaVolume, mapCaixas, mapProdutos, paraJson, textoParaCliente, trocarCaixa, dimsTxt, fmtKg, fmtBrl, m3Volume,
+  agruparVolumes, calcular, caixasParaVolume, faixaVolumes, mapCaixas, mapProdutos, paraJson, textoParaCliente, trocarCaixa, dimsTxt, fmtKg, fmtBrl, m3Volume,
   pesoTotal, m3Total, volumeCaixa, DESCRICAO_ORIGEM, type Caixa, type Pedido, type Resultado, type CaixaRow, type ProdutoRow,
 } from "@/lib/cubagem";
 import { avisosCorreios, CEP_ORIGEM_ANGIOLUX, dimsCorreios, fmtCep, pesoCubico, pesoParaCotacao, textoParaCorreios } from "@/lib/correios";
@@ -276,7 +276,7 @@ function CubagemPage() {
         <ResultadoView
           res={res}
           caixas={caixas}
-          onTrocar={(i, c) => setRes(trocarCaixa(res, i, c))}
+          onTrocar={(indices, c) => setRes(indices.reduce((r, i) => trocarCaixa(r, i, c), res))}
           onRefazer={calc}
           onSalvar={salvar}
           salvando={salvando}
@@ -347,13 +347,14 @@ function CaixasIndisponiveis({ caixas, marcadas, onMudar }: { caixas: Map<number
 function ResultadoView({ res, caixas, onTrocar, onRefazer, onSalvar, salvando }: {
   res: Resultado;
   caixas: Map<number, Caixa>;
-  onTrocar: (indice: number, caixa: Caixa) => void;
+  onTrocar: (indices: number[], caixa: Caixa) => void;
   onRefazer: () => void;
   onSalvar: () => void;
   salvando: boolean;
 }) {
   const texto = textoParaCliente(res);
   const editado = res.volumes.some((v) => v.editado);
+  const grupos = agruparVolumes(res.volumes);
   const textoCorreios = textoParaCorreios(res);
   return (
     <section className="space-y-4">
@@ -373,12 +374,18 @@ function ResultadoView({ res, caixas, onTrocar, onRefazer, onSalvar, salvando }:
           <Table>
             <TableHeader><TableRow><TableHead className="w-10">Nº</TableHead><TableHead>Dimensões</TableHead><TableHead>Peso</TableHead><TableHead>m³</TableHead><TableHead>Caixa / conteúdo</TableHead></TableRow></TableHeader>
             <TableBody>
-              {res.volumes.map((v, i) => (
+              {grupos.map(({ volume: v, indices }) => {
+                const i = indices[0]!;
+                const n = indices.length;
+                return (
                 <TableRow key={i} className="align-top">
-                  <TableCell className="font-semibold">{i + 1}</TableCell>
+                  <TableCell className="whitespace-nowrap font-semibold">
+                    {faixaVolumes(indices)}
+                    {n > 1 && <div className="mt-1"><Badge variant="outline" className="whitespace-nowrap">{n} volumes iguais</Badge></div>}
+                  </TableCell>
                   <TableCell className="whitespace-nowrap font-mono text-sm">{dimsTxt(v.caixa)} cm</TableCell>
-                  <TableCell className="whitespace-nowrap">{fmtKg(v.peso)} kg</TableCell>
-                  <TableCell>{fmtNum(m3Volume(v), 4)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{fmtKg(v.peso)} kg{n > 1 && <span className="text-xs text-muted-foreground"> cada</span>}</TableCell>
+                  <TableCell>{fmtNum(m3Volume(v), 4)}{n > 1 && <span className="text-xs text-muted-foreground"> cada</span>}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-md bg-primary px-2 py-0.5 text-sm font-bold text-primary-foreground" title="Número da caixa (etiqueta da prateleira)">Caixa {v.caixa.codigo}</span>
@@ -389,12 +396,12 @@ function ResultadoView({ res, caixas, onTrocar, onRefazer, onSalvar, salvando }:
                     <ul className="mt-1 space-y-0.5 text-sm text-muted-foreground">{v.conteudo.map((c, k) => <li key={k}>{c}</li>)}</ul>
                     {v.pacotes.length > 0 && (
                       <div className="mt-2 flex items-center gap-2">
-                        <Label htmlFor={`troca-${i}`} className="text-xs text-muted-foreground">Trocar caixa</Label>
+                        <Label htmlFor={`troca-${i}`} className="text-xs text-muted-foreground">{n > 1 ? `Trocar caixa dos ${n}` : "Trocar caixa"}</Label>
                         <select
                           id={`troca-${i}`}
                           className="h-8 max-w-md rounded-md border border-input bg-card px-2 text-xs"
                           value={v.caixa.codigo}
-                          onChange={(e) => { const c = caixas.get(Number(e.target.value)); if (c) onTrocar(i, c); }}
+                          onChange={(e) => { const c = caixas.get(Number(e.target.value)); if (c) onTrocar(indices, c); }}
                         >
                           {!caixasParaVolume(v, caixas).some((o) => o.caixa.codigo === v.caixa.codigo) && (
                             <option value={v.caixa.codigo}>{v.caixa.codigo} · {nomeCurto(v.caixa)}</option>
@@ -411,7 +418,8 @@ function ResultadoView({ res, caixas, onTrocar, onRefazer, onSalvar, salvando }:
                     )}
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
@@ -457,12 +465,12 @@ function ResultadoView({ res, caixas, onTrocar, onRefazer, onSalvar, salvando }:
           <Table>
             <TableHeader><TableRow><TableHead className="w-10">Nº</TableHead><TableHead>C x L x A (cm)</TableHead><TableHead>Peso real</TableHead><TableHead>Peso cúbico</TableHead><TableHead>Peso p/ cotação</TableHead><TableHead>Observação</TableHead></TableRow></TableHeader>
             <TableBody>
-              {res.volumes.map((v, i) => {
+              {grupos.map(({ volume: v, indices }) => {
                 const [c, l, a] = dimsCorreios(v);
                 const av = avisosCorreios(v);
                 return (
-                  <TableRow key={i}>
-                    <TableCell className="font-semibold">{i + 1}</TableCell>
+                  <TableRow key={indices[0]}>
+                    <TableCell className="whitespace-nowrap font-semibold">{faixaVolumes(indices)}{indices.length > 1 && <span className="font-normal text-muted-foreground"> ({indices.length}x)</span>}</TableCell>
                     <TableCell className="whitespace-nowrap font-mono text-sm">{c} x {l} x {a}</TableCell>
                     <TableCell className="whitespace-nowrap">{fmtKg(v.peso)} kg</TableCell>
                     <TableCell className="whitespace-nowrap">{fmtKg(pesoCubico(v))} kg</TableCell>

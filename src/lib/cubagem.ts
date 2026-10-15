@@ -398,7 +398,7 @@ export function calcular(
           caixa: terc,
           origem: "fornecedor",
           peso: terc.peso + pacotes.reduce((s, p) => s + pesoPacote(p), 0),
-          conteudo: [`${terc.itens_terc} un ${prod.codigo} em ${n_secs} cx secundárias (caixa original cheia)`],
+          conteudo: [`${terc.itens_terc} un ${prod.codigo}` + (sec.itens_sec > 1 ? ` (${n_secs} cx secundárias)` : "")],
           pacotes,
         });
       }
@@ -570,6 +570,30 @@ function consolidar(blocosIn: Bloco[], candidatas: Caixa[], fator: number): { vo
   return { volumes, avisos };
 }
 
+/** Volumes idênticos e seguidos (mesma caixa, conteúdo e peso), para mostrar numa linha só. */
+export interface GrupoVolumes {
+  volume: Volume;
+  /** posições em `res.volumes` */
+  indices: number[];
+}
+
+export function agruparVolumes(volumes: Volume[]): GrupoVolumes[] {
+  const chave = (v: Volume) => `${v.caixa.codigo}|${v.origem}|${v.peso.toFixed(3)}|${v.editado ? 1 : 0}|${v.conteudo.join("¦")}`;
+  const grupos: GrupoVolumes[] = [];
+  volumes.forEach((v, i) => {
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && chave(ultimo.volume) === chave(v)) ultimo.indices.push(i);
+    else grupos.push({ volume: v, indices: [i] });
+  });
+  return grupos;
+}
+
+/** "4" ou "4 a 13" */
+export function faixaVolumes(indices: number[]): string {
+  const a = indices[0]! + 1, b = indices[indices.length - 1]! + 1;
+  return a === b ? String(a) : `${a} a ${b}`;
+}
+
 /** Monta (ou remonta) um volume com as secundárias dadas: conteúdo, peso e ocupação. */
 export function montarVolume(caixa: Caixa, pacotes: Pacote[], origem?: Origem): Volume {
   const grupos = new Map<string, Pacote[]>();
@@ -583,10 +607,13 @@ export function montarVolume(caixa: Caixa, pacotes: Pacote[], origem?: Origem): 
     const cheias = ps.filter((p) => p.unidades === p.caixa.itens_sec).length;
     const parciais = ps.filter((p) => p.unidades !== p.caixa.itens_sec);
     const un = ps.reduce((s, p) => s + p.unidades, 0);
-    let txt = `${ps.length}x ${ps[0]!.caixa.nome}`;
-    if (parciais.length && cheias) txt += ` (${cheias} cheia(s) + 1 parcial c/ ${parciais[0]!.unidades} un)`;
-    else if (parciais.length) txt += ` (parcial c/ ${parciais[0]!.unidades} un)`;
-    txt += ` = ${un} un ${ps[0]!.produto.codigo}`;
+    // "7 un SND250150-150"; quando a secundária leva mais de 1 unidade, diz quantas caixas são
+    let txt = `${un} un ${ps[0]!.produto.codigo}`;
+    if ((ps[0]!.caixa.itens_sec ?? 1) > 1) {
+      if (parciais.length && cheias) txt += ` (${cheias} cx cheia${cheias > 1 ? "s" : ""} + 1 com ${parciais[0]!.unidades} un)`;
+      else if (parciais.length) txt += ` (1 cx com ${parciais[0]!.unidades} un)`;
+      else txt += ` (${cheias} cx secundária${cheias > 1 ? "s" : ""})`;
+    }
     conteudo.push(txt);
   }
   const peso = caixa.peso + pacotes.reduce((s, p) => s + pesoPacote(p), 0);
