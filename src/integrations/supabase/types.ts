@@ -22,6 +22,7 @@ export type Database = {
           caixas_secundarias_permitidas_na_terciaria: number | null
           codigo_caixa: number
           comprimento_cm: number
+          fragil: boolean
           largura_cm: number
           nome_caixa: string
           observacao: string | null
@@ -39,6 +40,7 @@ export type Database = {
           caixas_secundarias_permitidas_na_terciaria?: number | null
           codigo_caixa: number
           comprimento_cm?: number
+          fragil?: boolean
           largura_cm?: number
           nome_caixa: string
           observacao?: string | null
@@ -56,6 +58,7 @@ export type Database = {
           caixas_secundarias_permitidas_na_terciaria?: number | null
           codigo_caixa?: number
           comprimento_cm?: number
+          fragil?: boolean
           largura_cm?: number
           nome_caixa?: string
           observacao?: string | null
@@ -70,6 +73,8 @@ export type Database = {
       }
       cubagens: {
         Row: {
+          cep: string | null
+          cidade: string | null
           cliente: string | null
           created_at: string | null
           data_pedido: string | null
@@ -82,12 +87,15 @@ export type Database = {
           resultado: Json | null
           texto_cliente: string | null
           tipo_frete: string | null
+          uf: string | null
           user_email: string | null
           user_id: string | null
           valor_nf: number | null
           volumes: Json | null
         }
         Insert: {
+          cep?: string | null
+          cidade?: string | null
           cliente?: string | null
           created_at?: string | null
           data_pedido?: string | null
@@ -100,12 +108,15 @@ export type Database = {
           resultado?: Json | null
           texto_cliente?: string | null
           tipo_frete?: string | null
+          uf?: string | null
           user_email?: string | null
           user_id?: string | null
           valor_nf?: number | null
           volumes?: Json | null
         }
         Update: {
+          cep?: string | null
+          cidade?: string | null
           cliente?: string | null
           created_at?: string | null
           data_pedido?: string | null
@@ -118,6 +129,7 @@ export type Database = {
           resultado?: Json | null
           texto_cliente?: string | null
           tipo_frete?: string | null
+          uf?: string | null
           user_email?: string | null
           user_id?: string | null
           valor_nf?: number | null
