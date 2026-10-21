@@ -11,9 +11,10 @@ texto pronto para o cliente cotar o frete (FOB / Correios).
 ## Como usar
 
 1. Entrar com e-mail e senha (ou criar conta na aba "Criar conta").
-2. **Cubagem**: arrastar o PDF do espelho do pedido, conferir os itens e quantidades
-   (pode adicionar itens manualmente), clicar em **Calcular cubagem** e copiar o bloco
-   **Texto para o cliente**. **Salvar no histórico** guarda o cálculo.
+2. **Cubagem**: arrastar o PDF do espelho do pedido (ou clicar em **Cubagem manual** e digitar
+   os itens), conferir itens e quantidades, clicar em **Calcular cubagem** e copiar o bloco
+   **Texto para o cliente**. Na seção **Dados para os Correios**, cada CEP, medida e peso tem
+   botão de copiar. **Salvar no histórico** guarda o cálculo.
 3. **Cadastros**: manutenção das caixas e dos produtos (busca, filtros, edição com duplo
    clique, incluir, excluir). **Validar cadastros** aponta inconsistências.
 4. **Histórico**: cubagens salvas, com busca por pedido/cliente e o texto para copiar.
@@ -25,15 +26,15 @@ Nasceu como porte do protótipo Python (`cubagem.py`) e foi ajustada com o uso n
 1. Cada item enche as caixas originais do fornecedor que conseguir (caixa cheia de um produto só).
 2. O que sobra vira secundárias: cheias + no máximo uma parcial por item.
 3. As sobras de todos os itens que usam a mesma caixa do fornecedor vão juntas para a caixa
-   original, mesmo incompleta (economia de caixas compradas). O espaço livre recebe secundárias de
-   outros produtos que caibam. Opcional: em Cadastros, "Mín. p/ usar original" define, por caixa,
-   a fração mínima para usar a original; vazio = sempre.
+   original (economia de caixas compradas), e o espaço livre recebe secundárias de outros produtos
+   que caibam. Se, mesmo assim, a caixa original ficar com **até 60% da lotação**, o conteúdo vai
+   para a menor caixa Angiolux que o comporta. Em Cadastros, "Mín. p/ usar original" muda esse
+   limite por caixa (vazio = 0,6; 0 = usar sempre a original).
 4. O que não couber em caixa de fornecedor vai para as caixas Angiolux: a menor que comporta tudo
    (85% de aproveitamento e checagem de dimensões); senão várias, reduzidas para a menor possível.
 
 - Secundárias marcadas como **frágeis** (balões Simeks e Simvalve) só dividem caixa com outras frágeis.
 - As secundárias de um mesmo produto ficam juntas sempre que possível.
-- **Caixas que não tenho hoje:** na tela Cubagem, marcar uma caixa em falta tira ela do cálculo.
 - **Trocar caixa:** cada volume do resultado tem uma lista com as caixas em que o conteúdo cabe;
   o app recalcula peso, m³ e textos, e o histórico guarda a versão editada.
 

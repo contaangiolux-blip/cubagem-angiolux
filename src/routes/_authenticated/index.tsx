@@ -2,11 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Calculator, Copy, FileUp, Loader2, Plus, Save, Trash2, Eraser, PackageX, RotateCcw } from "lucide-react";
+import { AlertTriangle, Calculator, Copy, FileUp, Loader2, Plus, Save, Trash2, Eraser, PencilLine, RotateCcw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { caixasQuery, produtosQuery, fmtNum } from "@/lib/data";
 import {
-  agruparVolumes, calcular, caixasParaVolume, faixaVolumes, mapCaixas, mapProdutos, paraJson, textoParaCliente, trocarCaixa, dimsTxt, fmtKg, fmtBrl, m3Volume,
+  agruparVolumes, calcular, caixasParaVolume, faixaVolumes, fmtDim, mapCaixas, mapProdutos, paraJson, textoParaCliente, trocarCaixa, dimsTxt, fmtKg, fmtBrl, m3Volume,
   pesoTotal, m3Total, volumeCaixa, DESCRICAO_ORIGEM, type Caixa, type Pedido, type Resultado, type CaixaRow, type ProdutoRow,
 } from "@/lib/cubagem";
 import { avisosCorreios, CEP_ORIGEM_ANGIOLUX, dimsCorreios, fmtCep, pesoCubico, pesoParaCotacao, textoParaCorreios } from "@/lib/correios";
@@ -38,24 +38,6 @@ const ehPdf = (f: File) => f.type === "application/pdf" || f.name.toLowerCase().
 /** "Caixa Terciária Angiolux Pequena" -> "Angiolux Pequena" */
 const nomeCurto = (c: Caixa) => c.nome.replace(/^Caixa (Terciária|Secundária) /i, "");
 
-/** Caixas marcadas como "não tenho hoje": lembradas no navegador até o fim do dia. */
-const CHAVE_INDISP = "cubagem.indisponiveis";
-function lerIndisponiveis(): number[] {
-  try {
-    const v = JSON.parse(localStorage.getItem(CHAVE_INDISP) ?? "null") as { dia: string; codigos: number[] } | null;
-    return v && v.dia === new Date().toDateString() ? v.codigos : [];
-  } catch {
-    return [];
-  }
-}
-function gravarIndisponiveis(codigos: number[]) {
-  try {
-    localStorage.setItem(CHAVE_INDISP, JSON.stringify({ dia: new Date().toDateString(), codigos }));
-  } catch {
-    /* navegador sem armazenamento: só não lembra */
-  }
-}
-
 function CubagemPage() {
   const cx = useQuery(caixasQuery);
   const pr = useQuery(produtosQuery);
@@ -69,10 +51,17 @@ function CubagemPage() {
   const [salvando, setSalvando] = useState(false);
   const [novoCod, setNovoCod] = useState("");
   const [novaQtd, setNovaQtd] = useState("1");
-  const [indisponiveis, setIndisponiveis] = useState<number[]>([]);
+  const [focarManual, setFocarManual] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setIndisponiveis(lerIndisponiveis()); }, []);
+  // "Cubagem manual": depois de abrir o pedido vazio, leva o cursor para o campo de adicionar item
+  useEffect(() => {
+    if (!focarManual || !pedido) return;
+    const campo = document.getElementById("novo-cod");
+    campo?.scrollIntoView({ behavior: "smooth", block: "center" });
+    campo?.focus();
+    setFocarManual(false);
+  }, [focarManual, pedido]);
 
   async function receber(file?: File | null) {
     if (!file) return;
@@ -121,7 +110,7 @@ function CubagemPage() {
 
   function calc() {
     if (!pedido?.itens.length) { toast.error("Adicione ao menos um item."); return; }
-    setRes(calcular({ ...pedido, itens: pedido.itens.filter((i) => i.qtd > 0) }, produtos, caixas, undefined, { indisponiveis }));
+    setRes(calcular({ ...pedido, itens: pedido.itens.filter((i) => i.qtd > 0) }, produtos, caixas));
   }
 
   function limpar() {
@@ -173,6 +162,13 @@ function CubagemPage() {
         {lendo ? <Loader2 className="h-8 w-8 animate-spin text-primary" /> : <FileUp className="h-8 w-8 text-primary" />}
         <p className="font-medium">{lendo ?? "Arraste o PDF do espelho do pedido ou clique para escolher"}</p>
         <p className="text-xs text-muted-foreground">Arquivo gerado pelo Odin (PDF em texto)</p>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-center gap-3 text-sm text-muted-foreground">
+        <span>Sem o PDF do pedido?</span>
+        <Button variant="secondary" onClick={() => { limpar(); setFocarManual(true); }}>
+          <PencilLine className="mr-1 h-4 w-4" />Cubagem manual
+        </Button>
       </div>
 
       {pedido && (
@@ -260,18 +256,6 @@ function CubagemPage() {
         </>
       )}
 
-      {pedido && caixas.size > 0 && (
-        <CaixasIndisponiveis
-          caixas={caixas}
-          marcadas={indisponiveis}
-          onMudar={(cods) => {
-            setIndisponiveis(cods);
-            gravarIndisponiveis(cods);
-            if (res && pedido) setRes(calcular({ ...pedido, itens: pedido.itens.filter((i) => i.qtd > 0) }, produtos, caixas, undefined, { indisponiveis: cods }));
-          }}
-        />
-      )}
-
       {res && (
         <ResultadoView
           res={res}
@@ -307,40 +291,18 @@ function Resumo({ titulo, valor }: { titulo: string; valor: string }) {
   );
 }
 
-function CaixasIndisponiveis({ caixas, marcadas, onMudar }: { caixas: Map<number, Caixa>; marcadas: number[]; onMudar: (c: number[]) => void }) {
-  const terciarias = [...caixas.values()].filter((c) => c.tipo === "terciaria");
-  const angiolux = terciarias.filter((c) => !c.fornecedor).sort((a, b) => a.codigo - b.codigo);
-  const fornecedor = terciarias.filter((c) => c.fornecedor).sort((a, b) => a.codigo - b.codigo);
-  const alternar = (cod: number) => onMudar(marcadas.includes(cod) ? marcadas.filter((c) => c !== cod) : [...marcadas, cod]);
-  const lista = (cs: Caixa[]) => (
-    <div className="flex flex-wrap gap-2">
-      {cs.map((c) => {
-        const fora = marcadas.includes(c.codigo);
-        return (
-          <button
-            key={c.codigo}
-            type="button"
-            onClick={() => alternar(c.codigo)}
-            title={fora ? "Marcada como indisponível hoje: clique para voltar a usar" : "Clique se não tiver esta caixa hoje"}
-            className={`rounded-md border px-2 py-1 text-xs transition-colors ${fora ? "border-destructive/50 bg-danger-soft text-destructive line-through" : "border-input bg-card hover:border-primary/60"}`}
-          >
-            <span className="font-semibold">{c.codigo}</span> · {nomeCurto(c)} <span className="text-muted-foreground">({dimsTxt(c)})</span>
-          </button>
-        );
-      })}
-    </div>
-  );
+/** Valor que copia ao clicar (para colar no site dos Correios). */
+function CopiarValor({ valor, destaque }: { valor: string; destaque?: boolean }) {
   return (
-    <details className="rounded-lg border bg-card p-4" open={marcadas.length > 0}>
-      <summary className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-        <PackageX className="h-4 w-4" />Caixas que não tenho hoje{marcadas.length ? ` (${marcadas.length} marcada(s))` : ""}
-      </summary>
-      <div className="mt-3 space-y-3">
-        <p className="text-xs text-muted-foreground">Clique nas caixas em falta: o cálculo deixa de sugeri-las. A marcação vale até o fim do dia neste computador.</p>
-        <div><p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Angiolux</p>{lista(angiolux)}</div>
-        <div><p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Fornecedor (vazias para reaproveitar)</p>{lista(fornecedor)}</div>
-      </div>
-    </details>
+    <button
+      type="button"
+      onClick={() => copiar(valor)}
+      title={`Copiar ${valor}`}
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-card px-2 py-0.5 font-mono text-sm transition-colors hover:border-primary hover:bg-accent ${destaque ? "font-semibold" : ""}`}
+    >
+      {valor}
+      <Copy className="h-3 w-3 text-muted-foreground" />
+    </button>
   );
 }
 
@@ -455,15 +417,17 @@ function ResultadoView({ res, caixas, onTrocar, onRefazer, onSalvar, salvando }:
           </div>
         </CardHeader>
         <CardContent className="space-y-3">
-          <p className="text-sm">
-            <span className="text-muted-foreground">Origem</span> <span className="font-mono">{fmtCep(CEP_ORIGEM_ANGIOLUX)}</span>
-            <span className="mx-2 text-muted-foreground">→</span>
-            <span className="text-muted-foreground">Destino</span>{" "}
-            {res.pedido.cep ? <span className="font-mono font-semibold">{fmtCep(res.pedido.cep)}</span> : <span className="text-warning">CEP não informado</span>}
-            {res.pedido.cidade && <span className="text-muted-foreground"> · {res.pedido.cidade}{res.pedido.uf ? `/${res.pedido.uf}` : ""}</span>}
-          </p>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+            <span className="flex items-center gap-2"><span className="text-muted-foreground">CEP origem</span><CopiarValor valor={fmtCep(CEP_ORIGEM_ANGIOLUX)} /></span>
+            <span className="flex items-center gap-2">
+              <span className="text-muted-foreground">CEP destino</span>
+              {res.pedido.cep ? <CopiarValor valor={fmtCep(res.pedido.cep)} destaque /> : <span className="text-warning">não informado</span>}
+              {res.pedido.cidade && <span className="text-muted-foreground">{res.pedido.cidade}{res.pedido.uf ? `/${res.pedido.uf}` : ""}</span>}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground">Clique em um valor para copiar e colar no site dos Correios.</p>
           <Table>
-            <TableHeader><TableRow><TableHead className="w-10">Nº</TableHead><TableHead>C x L x A (cm)</TableHead><TableHead>Peso real</TableHead><TableHead>Peso cúbico</TableHead><TableHead>Peso p/ cotação</TableHead><TableHead>Observação</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead className="w-16">Nº</TableHead><TableHead>Comprimento (cm)</TableHead><TableHead>Largura (cm)</TableHead><TableHead>Altura (cm)</TableHead><TableHead>Peso (kg)</TableHead><TableHead>Peso cúbico</TableHead><TableHead>Observação</TableHead></TableRow></TableHeader>
             <TableBody>
               {grupos.map(({ volume: v, indices }) => {
                 const [c, l, a] = dimsCorreios(v);
@@ -471,10 +435,11 @@ function ResultadoView({ res, caixas, onTrocar, onRefazer, onSalvar, salvando }:
                 return (
                   <TableRow key={indices[0]}>
                     <TableCell className="whitespace-nowrap font-semibold">{faixaVolumes(indices)}{indices.length > 1 && <span className="font-normal text-muted-foreground"> ({indices.length}x)</span>}</TableCell>
-                    <TableCell className="whitespace-nowrap font-mono text-sm">{c} x {l} x {a}</TableCell>
-                    <TableCell className="whitespace-nowrap">{fmtKg(v.peso)} kg</TableCell>
-                    <TableCell className="whitespace-nowrap">{fmtKg(pesoCubico(v))} kg</TableCell>
-                    <TableCell className="whitespace-nowrap font-semibold">{fmtKg(pesoParaCotacao(v))} kg</TableCell>
+                    <TableCell><CopiarValor valor={fmtDim(c)} /></TableCell>
+                    <TableCell><CopiarValor valor={fmtDim(l)} /></TableCell>
+                    <TableCell><CopiarValor valor={fmtDim(a)} /></TableCell>
+                    <TableCell><CopiarValor valor={fmtKg(v.peso)} /></TableCell>
+                    <TableCell className="whitespace-nowrap text-sm">{fmtKg(pesoCubico(v))} kg{pesoParaCotacao(v) > v.peso && <span className="text-muted-foreground"> (cobrado)</span>}</TableCell>
                     <TableCell className="text-sm">
                       {av.length ? <span className="text-destructive">Fora dos limites de SEDEX/PAC: {av.join("; ")}</span>
                         : pesoCubico(v) > v.peso ? <span className="text-muted-foreground">cobrado pelo peso cúbico (caixa grande para o conteúdo)</span>

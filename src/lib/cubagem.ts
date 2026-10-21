@@ -281,12 +281,12 @@ export function lerItensTexto(txt: string): Pedido {
 // --------------------------------------------------------------------------- //
 // Motor de cubagem (calcular)
 // --------------------------------------------------------------------------- //
-export interface OpcoesCalculo {
-  /** fração do volume interno das caixas Angiolux considerada aproveitável (padrão 0,85) */
-  fatorOcupacao?: number;
-  /** códigos das caixas terciárias que não estão disponíveis hoje (não serão sugeridas) */
-  indisponiveis?: Iterable<number>;
-}
+/**
+ * Ocupação mínima para despachar a caixa original do fornecedor incompleta (fração da lotação,
+ * já contando outros produtos que entraram nela). Até esse valor, compensa trocar por uma caixa
+ * Angiolux menor. Editável por caixa em Cadastros (`terciaria_parcial_minimo`).
+ */
+export const MINIMO_CAIXA_ORIGINAL = 0.6;
 
 /** Todas as secundárias de um mesmo produto: o motor tenta não separá-las em caixas diferentes. */
 interface Bloco {
@@ -337,8 +337,9 @@ function lotacaoFornecedor(terc: Caixa, sec: Caixa): number {
  *   1. cada item enche as caixas originais do fornecedor que conseguir (caixa cheia de um produto só);
  *   2. o que sobra vira secundárias (cheias + no máximo 1 parcial por item);
  *   3. as sobras de todos os itens que usam a mesma caixa do fornecedor vão juntas para a caixa
- *      original (sempre, ou a partir do mínimo `terciaria_parcial_minimo`, se preenchido), e o espaço
- *      livre recebe secundárias de outros produtos que caibam;
+ *      original, e o espaço livre recebe secundárias de outros produtos que caibam; se, mesmo assim,
+ *      a caixa original ficar com até 60% da lotação (`terciaria_parcial_minimo`), o conteúdo vai
+ *      para a menor caixa Angiolux que o comporta;
  *   4. o que não couber em caixa de fornecedor vai para caixas Angiolux (a menor que comporta tudo,
  *      com 85% de aproveitamento e checagem de dimensões);
  *   - secundárias frágeis (balões) só dividem caixa com outras frágeis;
@@ -349,11 +350,9 @@ export function calcular(
   produtos: Map<string, Produto>,
   caixas: Map<number, Caixa>,
   fatorOcupacao: number = FATOR_OCUPACAO,
-  opcoes: OpcoesCalculo = {},
 ): Resultado {
-  const fator = opcoes.fatorOcupacao ?? fatorOcupacao;
-  const indisp = new Set(opcoes.indisponiveis ?? []);
-  const disponivel = (c: Caixa | undefined): c is Caixa => !!c && !indisp.has(c.codigo);
+  const fator = fatorOcupacao;
+  const disponivel = (c: Caixa | undefined): c is Caixa => !!c;
 
   const volumes: Volume[] = [];
   const avisos: string[] = [];
@@ -459,26 +458,52 @@ export function calcular(
       if (m) colocar(m, [p]);
       else paraAngiolux.push({ pacotes: [p], fragil: !!p.caixa.fragil, vol: volumePacote(p) });
     }
-    // 3c) mínimo opcional para usar a caixa original incompleta
-    const minimo = g.terc.parcial_min ?? 0;
-    for (const m of novas) {
-      if (!m.pacotes.length) continue;
-      if (minimo > 0 && m.pacotes.length < lotacao && m.pacotes.length < minimo * lotacao) {
-        paraAngiolux.push(...blocosPorProduto(m.pacotes));
-      } else {
-        montagens.push(m);
-      }
-    }
+    for (const m of novas) if (m.pacotes.length) montagens.push(m);
   }
 
-  // 3d) espaço livre das caixas de fornecedor abertas recebe as sobras que iriam para caixa Angiolux
-  for (const b of [...paraAngiolux].sort((x, y) => y.vol - x.vol)) {
-    const m = montagens.find((x) => cabeBloco(x, b));
-    if (m) {
-      colocar(m, b.pacotes);
-      paraAngiolux.splice(paraAngiolux.indexOf(b), 1);
+  // 3c) o espaço livre das caixas de fornecedor abertas recebe as sobras que iriam para caixa Angiolux
+  const preencher = () => {
+    for (const b of [...paraAngiolux].sort((x, y) => y.vol - x.vol)) {
+      const m = montagens.find((x) => cabeBloco(x, b));
+      if (m) {
+        colocar(m, b.pacotes);
+        paraAngiolux.splice(paraAngiolux.indexOf(b), 1);
+      }
     }
+  };
+  preencher();
+
+  // 3d) caixa original com até 60% da lotação (já com os outros produtos) troca por caixa Angiolux;
+  //     começa pela mais vazia, e o conteúdo dela ainda pode completar outra caixa original aberta
+  const ocupacao = (m: Montagem) => m.usado / m.capacidade;
+  const fraca = (m: Montagem) => ocupacao(m) < 1 - 1e-9 && ocupacao(m) <= (m.caixa.parcial_min ?? MINIMO_CAIXA_ORIGINAL) + 1e-9;
+  for (;;) {
+    const m = montagens.filter(fraca).sort((a, b) => ocupacao(a) - ocupacao(b))[0];
+    if (!m) break;
+    montagens.splice(montagens.indexOf(m), 1);
+    // produtos de outra família que tinham entrado nela: voltam para a própria caixa original se a encherem bem
+    const porOrigem = new Map<number, Bloco[]>();
+    for (const b of blocosPorProduto(m.pacotes)) {
+      const t = b.pacotes[0]!.caixa.terc_fornecedor;
+      if (t && t !== m.caixa.codigo && disponivel(caixas.get(t))) {
+        if (!porOrigem.has(t)) porOrigem.set(t, []);
+        porOrigem.get(t)!.push(b);
+      } else {
+        paraAngiolux.push(b);
+      }
+    }
+    for (const [cod, bs] of porOrigem) {
+      const terc = caixas.get(cod)!;
+      const sec = bs[0]!.pacotes[0]!.caixa;
+      const lot = lotacaoFornecedor(terc, sec);
+      const nova: Montagem = { caixa: terc, pacotes: [], capacidade: lot * volumeCaixa(sec), usado: 0, fragil: bs[0]!.fragil, lotacao: lot };
+      for (const b of bs) colocar(nova, b.pacotes);
+      if (nova.usado <= nova.capacidade + 1e-6 && !fraca(nova)) montagens.push(nova);
+      else paraAngiolux.push(...bs);
+    }
+    preencher();
   }
+
   for (const m of montagens) {
     const cheia = m.lotacao !== undefined && m.pacotes.length >= m.lotacao && m.pacotes.every((p) => p.caixa.terc_fornecedor === m.caixa.codigo);
     volumes.push(montarVolume(m.caixa, m.pacotes, cheia ? "fornecedor" : "fornecedor_parcial"));
@@ -594,6 +619,16 @@ export function faixaVolumes(indices: number[]): string {
   return a === b ? String(a) : `${a} a ${b}`;
 }
 
+/**
+ * Ocupação da caixa: nas caixas originais do fornecedor, sobre a lotação dela (a mesma medida da regra
+ * dos 60%: 4 de 10 secundárias = 40%); nas demais, sobre o volume interno.
+ */
+export function ocupacaoCaixa(caixa: Caixa, pacotes: Pacote[]): number {
+  const propria = caixa.fornecedor ? pacotes.find((p) => p.caixa.terc_fornecedor === caixa.codigo)?.caixa : undefined;
+  const capacidade = propria ? lotacaoFornecedor(caixa, propria) * volumeCaixa(propria) : volumeCaixa(caixa);
+  return volPacotes(pacotes) / capacidade;
+}
+
 /** Monta (ou remonta) um volume com as secundárias dadas: conteúdo, peso e ocupação. */
 export function montarVolume(caixa: Caixa, pacotes: Pacote[], origem?: Origem): Volume {
   const grupos = new Map<string, Pacote[]>();
@@ -617,8 +652,7 @@ export function montarVolume(caixa: Caixa, pacotes: Pacote[], origem?: Origem): 
     conteudo.push(txt);
   }
   const peso = caixa.peso + pacotes.reduce((s, p) => s + pesoPacote(p), 0);
-  const ocup = (volPacotes(pacotes) / volumeCaixa(caixa)) * 100;
-  conteudo.push(`ocupação volumétrica: ${Math.round(ocup)}%`);
+  conteudo.push(`ocupação: ${Math.round(ocupacaoCaixa(caixa, pacotes) * 100)}%`);
   const o: Origem = origem ?? (caixa.fornecedor ? "reaproveitada" : "angiolux");
   if (o === "fornecedor_parcial") conteudo.push("caixa original incompleta: completar com enchimento");
   return { caixa, origem: o, peso, conteudo, pacotes };
@@ -640,7 +674,12 @@ export function caixasParaVolume(v: Volume, caixas: Map<number, Caixa>, fator: n
   const vol = volPacotes(v.pacotes);
   return [...caixas.values()]
     .filter((c) => c.tipo === "terciaria" && v.pacotes.every((p) => cabe(c, p.caixa)) && vol <= volumeCaixa(c))
-    .map((c) => ({ caixa: c, ocupacao: vol / volumeCaixa(c), apertada: vol > volumeCaixa(c) * fator }))
+    .map((c) => {
+      const ocupacao = ocupacaoCaixa(c, v.pacotes);
+      const propria = c.fornecedor && v.pacotes.some((p) => p.caixa.terc_fornecedor === c.codigo);
+      return { caixa: c, ocupacao, apertada: propria ? ocupacao > 1 + 1e-9 : vol > volumeCaixa(c) * fator };
+    })
+    .filter((o) => o.ocupacao <= 1 + 1e-9)
     .sort((a, b) => volumeCaixa(a.caixa) - volumeCaixa(b.caixa));
 }
 
