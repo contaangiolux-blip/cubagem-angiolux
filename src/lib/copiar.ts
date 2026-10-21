@@ -17,6 +17,9 @@ function copiarAntigo(txt: string): boolean {
 
 export function copiar(txt: string) {
   const avisar = (ok: boolean) => (ok ? toast.success(`Copiado: ${txt.length > 30 ? "texto" : txt}`) : toast.error("Não foi possível copiar"));
-  if (!navigator.clipboard?.writeText) return avisar(copiarAntigo(txt));
+  if (!navigator.clipboard?.writeText) {
+    avisar(copiarAntigo(txt));
+    return;
+  }
   navigator.clipboard.writeText(txt).then(() => avisar(true), () => avisar(copiarAntigo(txt)));
 }
